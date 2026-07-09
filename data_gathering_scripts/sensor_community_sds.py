@@ -1,14 +1,15 @@
 """
-pulls the sds011.zip for whichever months you
-specify, for year 2024. 
+pulls the sensor zip files for whichever months you
+specify, for year 2024.
 
 resumable downloads since
 the archive server drops connections very often.
 
 TO use examples:
 I recommend downloading one month at a time since it takes 2/3 hours for me
-    python download_months.py 01 02 03
-    python download_months.py 04 05 06 --workers 2
+    python sensor_community_sds.py 01 02 03
+    python sensor_community_sds.py 04 05 06 --workers 2
+    python sensor_community_sds.py 10 11 12 --types sds011 pms5003
 """
 
 import argparse
@@ -26,6 +27,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 RAW_DIR = SCRIPT_DIR.parent / "data" / "raw"
 HEADERS = {"User-Agent": "dl-course-pm-research/1.0 (student project)"}
 LOG_EVERY_SECONDS = 30
+SENSOR_TYPES = ["sds011", "pms1003", "pms3003", "pms5003", "pms6003", "pms7003", "sps30"]
 
 
 def is_valid_zip(path: Path) -> bool:
@@ -102,6 +104,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("months", nargs="+",
                         help="Two-digit months to download, e.g. 01 02 03")
+    parser.add_argument("--types", nargs="+", default=SENSOR_TYPES,
+                        help=f"Sensor types to download (default: all of {SENSOR_TYPES})")
     parser.add_argument("--workers", type=int, default=3)
     args = parser.parse_args()
 
@@ -112,9 +116,10 @@ def main():
         ym = f"{YEAR}-{month}"
         month_dir = RAW_DIR / ym
         month_dir.mkdir(parents=True, exist_ok=True)
-        fname = f"{ym}_sds011.zip"
-        url = f"{BASE_URL}{ym}/{fname}"
-        tasks.append((url, month_dir / fname))
+        for sensor_type in args.types:
+            fname = f"{ym}_{sensor_type}.zip"
+            url = f"{BASE_URL}{ym}/{fname}"
+            tasks.append((url, month_dir / fname))
 
     print(f"Downloading {len(tasks)} file(s):")
     for _, dest in tasks:
