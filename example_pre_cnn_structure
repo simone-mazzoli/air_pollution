@@ -1,0 +1,11 @@
+{
+    "location": "12345",              # sensor id, needed to avoid leaking same-sensor rows across train/val/test
+    "lat": 48.7758,
+    "lon": 9.1829,
+    "land": "Baden-Wuerttemberg",     # for the held-out-Land split
+    "month": "2024-01",               # or whatever your final temporal granularity is
+    "PM10_corrected": 18.4,           # the actual regression target(s) -- this is the output of applying a/b/kappa, not the params themselves
+    "PM2.5_corrected": 11.2,
+    "patch_local_path": "patches/local/12345_2024-01.npy",   # or however you index into your GEE exports
+    "patch_wide_path": "patches/wide/12345_2024-01.npy",
+}
