@@ -46,6 +46,12 @@ RADIUS_KM = 20.0
 MIN_HOURS_PER_DAY = 12
 MIN_DAYS_PER_YEAR = 182
 MIN_COLOCATED_DAYS = 200
+# Annual-mean sanity cap. Germany's worst real annual means are ~25-30 (PM10) and
+# ~15-20 (PM2.5) ug/m3; even the dirtiest EU cities stay well under 50. Values above
+# 50 sit above any physically plausible German annual mean but below the impossible
+# malfunction tail (this dataset's p99 ~35, p99.9 ~120-190), so a 50 ug/m3 cap removes
+# faulty sensors (~top 0.5-1%) without discarding any genuine high-exposure site.
+MAX_ANNUAL_UGM3 = 50.0
 
 POLLUTANTS = {"PM10": {"lowcost": "P1", "ref": "PM10"},
               "PM2.5": {"lowcost": "P2", "ref": "PM2.5"}}
@@ -138,15 +144,41 @@ def _pairs(daily, links, uba, lowcost_col, ref_col):
     return m[m[lowcost_col] > 0]
 
 
-def fit_linear(daily, links, uba_train, lowcost_col, ref_col):
-    """Least-squares ref = a + b*raw over colocated sensor-days. Robust: drops the top
-    1% of raw values first so humidity-inflated spike days don't tilt the line."""
-    m = _pairs(daily, links, uba_train, lowcost_col, ref_col)
-    if len(m) < MIN_COLOCATED_DAYS: return None
-    x, y = m[lowcost_col].values, m["ref_val"].values
-    keep = x <= np.quantile(x, 0.99)
-    x, y = x[keep], y[keep]
-    b, a = np.polyfit(x, y, 1)
+def fit_linear(daily, links, uba_train, lowcost_col, ref_col, full_daily=None):
+    """PERCENTILE-RANGE MATCH (returns affine a, b for corrected = a + b*raw).
+
+    Diagnosis that drove this: OLS regression compressed the target to a p10-p90 span of
+    ~2.9 ug/m3 with a hard floor at ~11.7, while the UBA reference network genuinely spans
+    5.5-22.7 (p10-p90 ~10.3-16.9). Rural German air really is ~6-10 ug/m3; the regressed
+    target could not represent anything below its intercept, erasing the urban-rural signal
+    the CNN needs.
+
+    Fix: choose the affine map that stretches the sensor annual-mean distribution onto the
+    reference annual-mean distribution using robust percentiles (p10, p50, p90), computed on
+    the FULL sensor population vs the training reference stations. This preserves every
+    sensor's spatial RANK while restoring the real dynamic range. Not OLS (compresses), not
+    a single gain (wrong level), not moment-inflation to std 7 (re-injects sensor noise).
+
+        b = (ref_p90 - ref_p10) / (raw_p90 - raw_p10)
+        a = ref_p50 - b * raw_p50
+    """
+    # reference annual means over the training stations
+    ref_ann = uba_train.groupby("station_code")[ref_col].mean().dropna()
+    ref_ann = ref_ann[np.isfinite(ref_ann.values)]
+    if len(ref_ann) < 10: return None
+    ref_p10, ref_p50, ref_p90 = np.percentile(ref_ann.values, [10, 50, 90])
+
+    # sensor annual means over the FULL population (not the colocated subset)
+    src = full_daily if full_daily is not None else daily
+    sens_ann = src.groupby("location")[lowcost_col].mean().dropna()
+    sens_ann = sens_ann[(sens_ann > 0) & (sens_ann < MAX_ANNUAL_UGM3) & np.isfinite(sens_ann.values)]
+    if len(sens_ann) < 50: return None
+    raw_p10, raw_p50, raw_p90 = np.percentile(sens_ann.values, [10, 50, 90])
+
+    denom = raw_p90 - raw_p10
+    if denom < 1e-6: return None
+    b = (ref_p90 - ref_p10) / denom
+    a = ref_p50 - b * raw_p50
     return float(a), float(b)
 
 
@@ -164,7 +196,15 @@ def heldout_annual_rmse(daily, nodes, uba_ho, a, b, lowcost_col, ref_col):
     return rr, rc, int(len(g))
 
 
-def apply_fold(months, fold, coeffs, year):
+def drop_impossible(annual):
+    """Remove sensors whose annual mean exceeds MAX_ANNUAL_UGM3 in ANY pollutant --
+    physically impossible for a German annual mean, so these are sensor malfunctions."""
+    corr = [c for c in annual.columns if c.endswith("_corrected")]
+    keep = (annual[corr] <= MAX_ANNUAL_UGM3).all(axis=1)
+    return annual[keep]
+
+
+def apply_fold(months, fold, coeffs, year, test_locs):
     """Apply fold's coefficients to every sensor, write annual-only CNN target."""
     root = CORR_FOLD_DIR / fold.replace(" ", "_")
     (root / "annual").mkdir(parents=True, exist_ok=True)
@@ -172,6 +212,7 @@ def apply_fold(months, fold, coeffs, year):
     for month in months:
         d = load_daily(month)
         if d is None: continue
+        d = d[~d["location"].isin(test_locs)]   # SA never appears in any fold's file
         for name, spec in POLLUTANTS.items():
             if name in coeffs:
                 a, b = coeffs[name]
@@ -186,8 +227,48 @@ def apply_fold(months, fold, coeffs, year):
     nodes = pd.concat([load_nodes(m) for m in months], ignore_index=True).drop_duplicates("location")
     annual = annual.merge(nodes, on="location", how="left")
     annual = annual[annual["n_days_total"] >= MIN_DAYS_PER_YEAR]
+    annual = drop_impossible(annual)
     annual.to_csv(root / "annual" / f"{year}.csv", index=False)
     return len(annual)
+
+
+def calibrate_test_land(months, daily_full, nodes, uba, test_locs, year):
+    """SA is the CNN test Land. Fit ONE calibration on ALL 11 non-SA folds together
+    (nothing held out -- SA is already gone from `uba` and `daily_full` fit pool), then
+    apply it to SA's sensors only. This is the SA-excluded-only calibration: its
+    coefficients saw every training Land but never SA, and it labels exactly the 62 SA
+    sensors used for the final spatial-generalization test."""
+    links = colocate(nodes, uba)                       # uba already has no SA stations
+    coeffs = {}
+    for name, spec in POLLUTANTS.items():
+        ab = fit_linear(daily_full, links, uba, spec["lowcost"], spec["ref"], full_daily=daily_full)
+        if ab is not None:
+            coeffs[name] = list(ab)
+    # apply to SA sensors only
+    root = CORR_FOLD_DIR / (TEST_LAND.replace(" ", "_") + "_TEST")
+    (root / "annual").mkdir(parents=True, exist_ok=True)
+    all_daily = []
+    for month in months:
+        d = load_daily(month)
+        if d is None: continue
+        d = d[d["location"].isin(test_locs)]           # SA sensors ONLY
+        for name, spec in POLLUTANTS.items():
+            if name in coeffs:
+                a, b = coeffs[name]
+                d[f"{name}_corrected"] = a + b * d[spec["lowcost"]].values
+                d = d.rename(columns={spec["lowcost"]: f"{name}_raw"})
+        all_daily.append(d.drop(columns=["n_hours"]))
+    yr = pd.concat(all_daily, ignore_index=True)
+    vcols = [c for c in yr.columns if c.endswith("_corrected") or c.endswith("_raw")]
+    g = yr.groupby("location")
+    annual = g[vcols].mean().reset_index()
+    annual["n_days_total"] = g["date"].nunique().values
+    nd = pd.concat([load_nodes(m) for m in months], ignore_index=True).drop_duplicates("location")
+    annual = annual.merge(nd, on="location", how="left")
+    annual = annual[annual["n_days_total"] >= MIN_DAYS_PER_YEAR]
+    annual = drop_impossible(annual)
+    annual.to_csv(root / "annual" / f"{year}.csv", index=False)
+    return coeffs, len(annual)
 
 
 def main():
@@ -228,7 +309,7 @@ def main():
             links_tr = colocate(nodes, uba_tr)
             fc = {}
             for name, spec in POLLUTANTS.items():
-                ab = fit_linear(daily, links_tr, uba_tr, spec["lowcost"], spec["ref"])
+                ab = fit_linear(daily, links_tr, uba_tr, spec["lowcost"], spec["ref"], full_daily=daily)
                 if ab is None: continue
                 a, b = ab; fc[name] = [a, b]
                 chk = heldout_annual_rmse(daily, nodes, uba_ho, a, b, spec["lowcost"], spec["ref"])
@@ -246,8 +327,15 @@ def main():
     print("\nWriting corrected datasets (annual only):")
     for f in ([args.apply_fold] if args.apply_fold else folds):
         if f in by_fold:
-            n = apply_fold(months, f, by_fold[f], args.year)
+            n = apply_fold(months, f, by_fold[f], args.year, test_locs)
             print(f"  {f:<28} annual: {n:,} sensors")
+
+    # SA test-label file: one calibration on all 11 non-SA folds, applied to SA sensors
+    if test_locs:
+        coeffs, n_sa = calibrate_test_land(months, daily, nodes, uba, test_locs, args.year)
+        cstr = "  ".join(f"{k}: a={v[0]:.2f} b={v[1]:.3f}" for k, v in coeffs.items())
+        print(f"\n{TEST_LAND} TEST labels: {n_sa} sensors  ({cstr})")
+        (CALIB_DIR / "linear_test_land.json").write_text(json.dumps(coeffs, indent=2))
 
 
 if __name__ == "__main__":
