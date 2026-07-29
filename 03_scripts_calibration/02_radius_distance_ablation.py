@@ -1,27 +1,16 @@
 """
 Representativeness-vs-distance diagnostic.
 
-WHY: a flat r-vs-radius sweep can't detect the thing radius actually controls.
-Two nearby daily PM series track each other in SHAPE regardless of distance, so
-pooled correlation stays high even as the matched air becomes less representative.
-What radius actually trades off is BIAS/LEVEL, not correlation.
-
-THE REAL TEST: fit each sensor's (a,b) against its NEAREST station (as
-calibrate_pm.py already does), then validate against its SECOND-nearest
-station's actual daily values -- genuine holdout, a station never used in the
-fit. Bin sensors by distance-to-nearest and watch holdout RMSE. If it stays
-flat out to large distances, a hard radius cutoff is unnecessary (the
-plausibility filters in calibrate_pm.py -- B_MIN/B_MAX, MIN_DAYS_PER_SENSOR_FIT
--- are already doing the real gatekeeping). If it rises sharply past some
+we fit each sensor's (a,b) against its nearest station (as
+03_calibrate_pm.py does), then validate against its second-nearest
+station's actual daily values. Bin sensors by distance-to-nearest and watch holdout RMSE. If it stays
+flat out to large distances, a hard radius cutoff is unnecessary. If it rises sharply past some
 distance, that's empirical support for a cutoff near that point.
+This is to check how detrimental it is to always go to nearest station regardless of distance
 
 Also reports the naive/uncorrected RMSE per bin as a baseline, so you can see
 whether per-sensor fitting still beats "no correction at all" even at long
 range, or whether it stops helping past some distance.
-
-Uses the already-fitted global kappa from calibrate_pm.py's output
-(data/processed/calibration/global_kappa.json) rather than re-sweeping kappa --
-this is a diagnostic on radius/distance, not another kappa search.
 
 Input:  data/processed/hourly/pm/all_pm_sensors/<YYYY-MM>.parquet
         data/processed/hourly/humidity/all_sensors/<YYYY-MM>.parquet
