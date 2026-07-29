@@ -40,6 +40,15 @@ for land, fold in LAND_TO_FOLD.items():
     CANDIDATES.setdefault(fold, []).append(land)
 
 
+def _canon(s):
+    # normalize Land names so ASCII keys (Baden-Wuerttemberg, Thueringen) match the
+    # geojson's native spellings (Baden-Wuerttemberg, Thueringen) -- umlauts, ss, and
+    # separators are folded to a common form on both sides before comparing
+    return (str(s).lower()
+            .replace("ä", "ae").replace("ö", "oe").replace("ü", "ue").replace("ß", "ss")
+            .replace("-", " ").replace("_", " ").strip())
+
+
 def load_land_polygons():
     gdf = gpd.read_file(GEOJSON_PATH)
     if gdf.crs is None:
@@ -103,7 +112,8 @@ def load_sensors_with_fold():
 def coverage_for_candidate(fold_name, land_names, land_gdf, name_col, sensors):
     # dissolve the (possibly multiple) states into one polygon, reproject to
     # the equal-area CRS for correct buffering/area math
-    polys = land_gdf[land_gdf[name_col].isin(land_names)]
+    wanted = {_canon(n) for n in land_names}
+    polys = land_gdf[land_gdf[name_col].map(_canon).isin(wanted)]
     if polys.empty:
         print(f"  WARNING: no polygon(s) matched {land_names} in the geojson -- "
               f"check spelling against the available names printed above")

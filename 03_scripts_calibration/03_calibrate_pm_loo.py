@@ -1,18 +1,23 @@
 """
 Calibrate low-cost PM against UBA reference stations, leave-one-fold-out (no leakage).
 
-Global linear calibration per pollutant per fold: fit ref = a + b*raw by least squares
-over all colocated sensor-days on the OTHER 11 folds, then apply a + b*raw to every
-sensor. One (a,b) shared by all sensors, so sensors stay independent measurements (not
-pinned to individual stations). Refit 12 times, each excluding the held-out fold's own
-stations. Quality is reported on the held-out fold's stations (never seen by the fit):
-annual-mean RMSE of raw vs calibrated sensors against those references.
+Sachsen-Anhalt is the CNN test Land and is EXCLUDED FROM EVERYTHING here -- its
+reference stations and its sensors are dropped before calibration starts, so no
+coefficient any training sensor receives is ever informed by test-Land data.
+
+Among the remaining 11 folds: leave-one-fold-out. Each fold F takes a turn held out;
+its linear calibration ref = a + b*raw (least squares over colocated sensor-days) is
+fit on the OTHER 10 folds, then applied to F's sensors. Quality is reported on F's own
+stations (never seen by the fit): annual-mean RMSE of raw vs calibrated.
+
+One (a,b) per pollutant per fold, shared by all sensors -- sensors stay independent
+measurements, not pinned to individual stations.
 
 Humidity note: low-cost PM over-reads at high RH (hygroscopic growth) and averaging
 doesn't remove it; on-node RH sensors saturate near 100%, so it's a documented
 limitation, not corrected here.
 
-16 Laender -> 12 folds. Output: corrected/fold/<fold>/annual/<year>.csv (CNN target).
+Output: corrected/fold/<fold>/annual/<year>.csv  (CNN target, annual only)
 """
 
 import argparse, json, re, warnings
@@ -27,13 +32,18 @@ PM_HOURLY_DIR = PROC / "hourly" / "pm" / "all_pm_sensors"
 NODES_DIR = PROC / "hourly" / "pm" / "nodes"
 UBA_DAILY = PROC / "daily_avg" / "uba" / "pm_reference_stations_{year}.csv"
 STATION_LAND_PATH = PROC / "uba" / "station_land.csv"
+SENSOR_LAND_PATH = PROC / "sensor_land.csv"
 CALIB_DIR = PROC / "calibration"
 CORR_FOLD_DIR = PROC / "corrected" / "fold"
+
+# The CNN test Land. Removed from calibration entirely -- never fits a coefficient,
+# never a validation fold. Its sensors still get calibrated labels (below) so they're
+# comparable at test time, but using coefficients that never saw its stations.
+TEST_LAND = "Sachsen-Anhalt"
 
 UTC_TO_MEZ_HOURS = 1
 RADIUS_KM = 20.0
 MIN_HOURS_PER_DAY = 12
-MIN_DAYS_PER_MONTH = 10
 MIN_DAYS_PER_YEAR = 182
 MIN_COLOCATED_DAYS = 200
 
@@ -51,6 +61,7 @@ LAND_TO_FOLD = {
     "Nordrhein-Westfalen": "Nordrhein-Westfalen", "Sachsen": "Sachsen",
     "Sachsen-Anhalt": "Sachsen-Anhalt", "Thueringen": "Thueringen",
 }
+TEST_FOLD = LAND_TO_FOLD[TEST_LAND]  # fold group the test Land belongs to
 
 
 def haversine_km(lat1, lon1, lat2, lon2):
@@ -90,7 +101,21 @@ def load_uba(year):
     sl = pd.read_csv(STATION_LAND_PATH)[["station_code", "land"]]
     df = df.merge(sl, on="station_code", how="left")
     df["fold"] = df["land"].map(LAND_TO_FOLD)
-    return df.dropna(subset=["fold"])[["station_code", "lat", "lon", "date", "PM10", "PM2.5", "fold"]]
+    df = df.dropna(subset=["fold"])
+    # HARD-EXCLUDE the test Land's stations from the whole calibration universe
+    df = df[df["land"] != TEST_LAND]
+    return df[["station_code", "lat", "lon", "date", "PM10", "PM2.5", "fold"]]
+
+
+def load_test_sensor_locations():
+    """Sensor ids that belong to the test Land -- these are dropped from the fit's
+    sensor pool so no test-Land sensor-day ever tilts a training coefficient."""
+    if not SENSOR_LAND_PATH.exists():
+        return set()
+    s = pd.read_csv(SENSOR_LAND_PATH)
+    if "land" not in s.columns:
+        return set()
+    return set(s.loc[s["land"] == TEST_LAND, "location"])
 
 
 def colocate(nodes, uba_subset):
@@ -130,7 +155,6 @@ def heldout_annual_rmse(daily, nodes, uba_ho, a, b, lowcost_col, ref_col):
     links = colocate(nodes, uba_ho)
     m = _pairs(daily, links, uba_ho, lowcost_col, ref_col)
     if len(m) < 30: return None
-    # collapse to one annual mean per sensor and its station's annual mean
     g = m.groupby("location").agg(raw=(lowcost_col, "mean"),
                                   ref=("ref_val", "mean")).reset_index()
     raw, ref = g["raw"].values, g["ref"].values
@@ -141,35 +165,28 @@ def heldout_annual_rmse(daily, nodes, uba_ho, a, b, lowcost_col, ref_col):
 
 
 def apply_fold(months, fold, coeffs, year):
+    """Apply fold's coefficients to every sensor, write annual-only CNN target."""
     root = CORR_FOLD_DIR / fold.replace(" ", "_")
-    for s in ("daily", "monthly", "annual"): (root/s).mkdir(parents=True, exist_ok=True)
+    (root / "annual").mkdir(parents=True, exist_ok=True)
     all_daily = []
     for month in months:
         d = load_daily(month)
         if d is None: continue
-        nodes = load_nodes(month)
         for name, spec in POLLUTANTS.items():
             if name in coeffs:
                 a, b = coeffs[name]
                 d[f"{name}_corrected"] = a + b * d[spec["lowcost"]].values
                 d = d.rename(columns={spec["lowcost"]: f"{name}_raw"})
-        d = d.drop(columns=["n_hours"]).merge(nodes, on="location", how="left")
-        all_daily.append(d)
-        d.to_csv(root/"daily"/f"{month}.csv", index=False)
-        d["month"] = pd.to_datetime(d["date"]).dt.to_period("M")
-        vcols = [c for c in d.columns if c.endswith("_corrected") or c.endswith("_raw")]
-        agg = {c: (c, "mean") for c in vcols}; agg["n_days"] = ("date", "nunique")
-        mo = d.groupby("location").agg(**agg).reset_index()
-        mo = mo[mo["n_days"] >= MIN_DAYS_PER_MONTH].merge(nodes, on="location", how="left")
-        mo.to_csv(root/"monthly"/f"{month}.csv", index=False)
+        all_daily.append(d.drop(columns=["n_hours"]))
     yr = pd.concat(all_daily, ignore_index=True)
     vcols = [c for c in yr.columns if c.endswith("_corrected") or c.endswith("_raw")]
     g = yr.groupby("location")
     annual = g[vcols].mean().reset_index()
     annual["n_days_total"] = g["date"].nunique().values
-    annual = annual.merge(yr.drop_duplicates("location")[["location","lat","lon"]], on="location")
+    nodes = pd.concat([load_nodes(m) for m in months], ignore_index=True).drop_duplicates("location")
+    annual = annual.merge(nodes, on="location", how="left")
     annual = annual[annual["n_days_total"] >= MIN_DAYS_PER_YEAR]
-    annual.to_csv(root/"annual"/f"{year}.csv", index=False)
+    annual.to_csv(root / "annual" / f"{year}.csv", index=False)
     return len(annual)
 
 
@@ -187,19 +204,26 @@ def main():
 
     daily = pd.concat([load_daily(m) for m in months if load_daily(m) is not None], ignore_index=True)
     nodes = pd.concat([load_nodes(m) for m in months], ignore_index=True).drop_duplicates("location")
-    uba = load_uba(args.year)
-    folds = sorted(uba["fold"].unique())
+
+    # drop every test-Land sensor from the pool that fits coefficients
+    test_locs = load_test_sensor_locations()
+    if test_locs:
+        daily = daily[~daily["location"].isin(test_locs)]
+        print(f"Excluded {len(test_locs)} {TEST_LAND} sensors from the calibration pool")
+
+    uba = load_uba(args.year)  # test-Land stations already removed inside
+    folds = sorted(uba["fold"].unique())  # 11 folds; test fold not present
+    print(f"{len(folds)} calibration folds ({TEST_LAND} held out entirely): {folds}\n")
 
     cp = CALIB_DIR / "linear_by_fold.json"
     if cp.exists() and not args.refit:
         by_fold = json.loads(cp.read_text())
         print(f"Using existing calibration ({cp.name})")
     else:
-        print(f"{len(folds)} folds | fit on OTHER folds, annual RMSE checked on HELD-OUT fold:\n")
         print(f"  {'fold':<28} {'poll':<6} {'a':>7} {'b':>6}  {'RMSE raw':>8} {'RMSE cal':>8}  {'sensors':>7}")
         by_fold = {}
         for f in folds:
-            uba_tr = uba[uba["fold"] != f]
+            uba_tr = uba[uba["fold"] != f]   # other 10 non-test folds
             uba_ho = uba[uba["fold"] == f]
             links_tr = colocate(nodes, uba_tr)
             fc = {}
@@ -219,7 +243,7 @@ def main():
         cp.write_text(json.dumps(by_fold, indent=2))
         print(f"\nsaved {cp}")
 
-    print("\nWriting corrected datasets:")
+    print("\nWriting corrected datasets (annual only):")
     for f in ([args.apply_fold] if args.apply_fold else folds):
         if f in by_fold:
             n = apply_fold(months, f, by_fold[f], args.year)
