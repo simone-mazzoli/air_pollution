@@ -9,9 +9,6 @@ model (e.g. BIFOLD-BigEarthNetv2-0/resnet50-s2-v0.2.0) by:
   3. Resolving the band order for the model's channel count.
   4. Resolving the matching mean/std interpolation table for the model's image_size.
 
-Usage:
-    python get_ben_norm_config.py [model_id]
-
     model_id defaults to "BIFOLD-BigEarthNetv2-0/resnet50-s2-v0.2.0"
 """
 
