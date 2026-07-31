@@ -11,6 +11,28 @@ Streams:
     regional atmospheric field carries exactly the between-Land signal that
     held-out-Land CV demands.
 
+CHANGES vs previous version:
+  1. SKILL SCORE. Negative per-fold R2 compares against the val Land's own mean --
+     an oracle unavailable in deployment. The deployable reference is the TRAIN
+     mean; skill = 1 - RMSE_model / RMSE_trainmean is reported per fold and
+     averaged. Skill > 0 is the honest "beats predicting the mean" claim (both
+     recent runs already have it). Skill is also comparable across different
+     --smooth-km settings, unlike raw RMSE (heavier smoothing shrinks target
+     variance, deflating RMSE without the model being any better -- do NOT
+     compare raw RMSE across runs with different smoothing radii).
+  2. S5P SKIP CONNECTION. The raw z-scored scalars are concatenated directly
+     into the head input alongside the MLP features, so the model can represent
+     the linear solution (which beats the train mean on its own) without pushing
+     2 numbers through BN + dropout.
+  3. OVERFITTING DEFAULTS. Best val at epoch ~4 with train R2 still climbing =
+     overfitting on the now-learnable target. lr-head 1e-3 -> 3e-4, patience
+     20 -> 10. If the very-early-peak persists, lower --epochs too: the cosine
+     schedule anneals over --epochs, so a 70-epoch schedule never cools down for
+     a model that peaks at 5.
+  4. WIDE S5P STREAM (--s5p-wide no2 aer). Expects <name>_tropomi_wide/<loc>.npy
+     coarse grids (any HxW, e.g. 15x15 over ~100 km), one channel per stream,
+     z-scored on train pixel stats. Same rot/flip TTA and augmentation as the
+     S2 streams. Sensors missing a wide patch are dropped when the flag is on.
 
 Label-quality tools (binding constraint measured at sigma_sensor ~3.3 ug/m3):
   --grid-km K / --smooth-km R / --outlier-mad M / --weight-mode reliability
@@ -508,6 +530,18 @@ def fmt(m):
     return "  ".join(f"{n}: RMSE={v['rmse']:.2f} R2={v['r2']:.3f} sr={v['std_ratio']:.2f}"
                      for n, v in m.items())
 def mean_rmse(m): return float(np.mean([v["rmse"] for v in m.values()]))
+def metrics_from_preds(P, T):
+    """Same metric dict as evaluate(), from already-de-standardized ug/m3 arrays."""
+    out = {}
+    for i, n in enumerate(TARGETS):
+        p, t = P[:, i], T[:, i]
+        rmse = float(np.sqrt(np.mean((p - t) ** 2))); mae = float(np.mean(np.abs(p - t)))
+        ssr = np.sum((t - p) ** 2); sst = np.sum((t - t.mean()) ** 2)
+        out[n] = {"rmse": rmse, "mae": mae, "r2": float(1 - ssr / sst) if sst > 0 else float("nan"),
+                  "std_ratio": float(p.std() / t.std()) if t.std() > 0 else float("nan")}
+    return out
+
+
 def pooled_metrics(preds, trues):
     p = np.concatenate(preds)[:, 0]; t = np.concatenate(trues)[:, 0]
     sst = np.sum((t - t.mean()) ** 2)
@@ -525,16 +559,20 @@ def main():
     ap.add_argument("--lr-head", type=float, default=3e-4)
     ap.add_argument("--lr-backbone", type=float, default=1e-5)
     ap.add_argument("--wd", type=float, default=5e-2)
-    ap.add_argument("--wd-head", type=float, default=1e-3,
-                    help="separate weight decay for the head params; --wd still governs the backbone")
     ap.add_argument("--head-dropout", type=float, default=0.4)
     ap.add_argument("--proj-dim", type=int, default=128)
+    ap.add_argument("--seeds", type=int, default=1,
+                    help="train N models per fold and average their predictions; "
+                         "3 is a good cost/benefit point")
     ap.add_argument("--folds", nargs="+", default=None)
     ap.add_argument("--out", default="resnet_cv_results.json")
     ap.add_argument("--s5p", nargs="+", default=["no2"],
                     help="scalar S5P streams: no2 aer co (must be fully downloaded)")
     ap.add_argument("--s5p-wide", nargs="+", default=[],
                     help="wide-context S5P streams; expects <name>_tropomi_wide/<loc>.npy grids")
+    ap.add_argument("--aux-wide", nargs="+", default=[],
+                    help="non-S5P wide streams by folder base name, e.g. maiac dem; "
+                         "expects <name>_wide/<loc>.npy (from 05_s5p_wide.py)")
     ap.add_argument("--grid-km", type=float, default=0.0)
     ap.add_argument("--smooth-km", type=float, default=0.0)
     ap.add_argument("--outlier-mad", type=float, default=0.0)
@@ -550,7 +588,7 @@ def main():
     global S5P_STREAMS, S5P_DIRS, WIDE_STREAMS, WIDE_DIRS
     S5P_STREAMS = [f"{s}_tropomi" for s in args.s5p]
     S5P_DIRS = {name: SAT_DIR / name for name in S5P_STREAMS}
-    WIDE_STREAMS = [f"{s}_tropomi" for s in args.s5p_wide]
+    WIDE_STREAMS = [f"{s}_tropomi" for s in args.s5p_wide] + list(args.aux_wide)
     WIDE_DIRS = {name: SAT_DIR / f"{name}_wide" for name in WIDE_STREAMS}
     for name in S5P_STREAMS:
         n = len(list(S5P_DIRS[name].glob("*.npy"))) if S5P_DIRS[name].exists() else 0
@@ -581,12 +619,12 @@ def main():
         print(f"########## VALIDATION FOLD: {val_fold} ##########")
         train_df = data[data["fold"] != val_fold].copy()
         val_df = data[data["fold"] == val_fold].copy()
-        if args.grid_km:
-            print("  train:", end=" "); train_df = aggregate_to_grid(train_df, args.grid_km)
-            print("  val:  ", end=" "); val_df = aggregate_to_grid(val_df, args.grid_km)
         if args.smooth_km:
             print("  train:", end=" "); train_df = smooth_labels(train_df, args.smooth_km)
             print("  val:  ", end=" "); val_df = smooth_labels(val_df, args.smooth_km)
+        if args.grid_km:
+            print("  train:", end=" "); train_df = aggregate_to_grid(train_df, args.grid_km)
+            print("  val:  ", end=" "); val_df = aggregate_to_grid(val_df, args.grid_km)
         train_df = attach_weights(train_df, args.weight_mode, args.density_radius)
         val_df = attach_weights(val_df, "none")
         tmean = train_df[TARGETS].values.mean(0).astype("float32")
@@ -617,41 +655,57 @@ def main():
             print(f"  BASELINE (OLS on S5P scalars): RMSE={lin['rmse']:.2f} R2={lin['r2']:.3f}"
                   f"   <- CNN must beat this or imagery adds nothing")
 
-        model = ResNetRegressor(len(TARGETS), n_s5p=len(S5P_STREAMS), n_wide=len(WIDE_STREAMS),
-                                head_dropout=args.head_dropout, proj_dim=args.proj_dim).to(DEVICE)
-        lossf = nn.SmoothL1Loss(reduction="none")
-        model.set_backbone_trainable(True, last_block_only=True)
-        backbone_params = [p for p in model.backbone.parameters() if p.requires_grad]
-        head_params = [p for n_, p in model.named_parameters() if not n_.startswith("backbone.")]
-        opt = torch.optim.AdamW([
-            {"params": backbone_params, "lr": args.lr_backbone, "weight_decay": args.wd},
-            {"params": head_params, "lr": args.lr_head, "weight_decay": args.wd_head},
-        ])
-        sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=args.epochs)
-        best, best_state, bad = np.inf, None, 0
-        for ep in range(1, args.epochs + 1):
-            tr = run_epoch(model, tr_loader, opt, lossf)
-            sched.step()
-            val = evaluate(model, va_loader, tmean, tstd, tta=not args.no_tta)
-            trm = evaluate(model, tm_loader, tmean, tstd, tta=False) if tm_loader else None
-            r = mean_rmse(val); flag = ""
-            if r < best - 1e-4:
-                best = r; best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
-                bad = 0; flag = " *"
-            else:
-                bad += 1
-            tr_str = (f"TRAIN R2={trm[TARGETS[0]]['r2']:.3f} RMSE={trm[TARGETS[0]]['rmse']:.2f}  "
-                      if trm else "")
-            skill = 1.0 - r / base_rmse
-            print(f"  [{ep:02d}] loss={tr:.3f}  {tr_str}VAL {fmt(val)} skill={skill:+.3f}{flag}")
-            if bad >= args.patience:
-                print(f"  early stop"); break
-        model.load_state_dict(best_state)
-        final, P, T = evaluate(model, va_loader, tmean, tstd, tta=not args.no_tta, return_preds=True)
+        seed_P, T = [], None
+        for seed in range(args.seeds):
+            torch.manual_seed(seed); np.random.seed(seed)
+            if args.seeds > 1:
+                print(f"  ----- seed {seed + 1}/{args.seeds} -----")
+            model = ResNetRegressor(len(TARGETS), n_s5p=len(S5P_STREAMS), n_wide=len(WIDE_STREAMS),
+                                    head_dropout=args.head_dropout, proj_dim=args.proj_dim).to(DEVICE)
+            lossf = nn.SmoothL1Loss(reduction="none")
+            model.set_backbone_trainable(True, last_block_only=True)
+            backbone_params = [p for p in model.backbone.parameters() if p.requires_grad]
+            head_params = [p for n_, p in model.named_parameters() if not n_.startswith("backbone.")]
+            opt = torch.optim.AdamW([
+                {"params": backbone_params, "lr": args.lr_backbone},
+                {"params": head_params, "lr": args.lr_head},
+            ], weight_decay=args.wd)
+            sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=args.epochs)
+            best, best_state, bad = np.inf, None, 0
+            for ep in range(1, args.epochs + 1):
+                tr = run_epoch(model, tr_loader, opt, lossf)
+                sched.step()
+                val = evaluate(model, va_loader, tmean, tstd, tta=not args.no_tta)
+                trm = evaluate(model, tm_loader, tmean, tstd, tta=False) if tm_loader else None
+                r = mean_rmse(val); flag = ""
+                if r < best - 1e-4:
+                    best = r; best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
+                    bad = 0; flag = " *"
+                else:
+                    bad += 1
+                tr_str = (f"TRAIN R2={trm[TARGETS[0]]['r2']:.3f} RMSE={trm[TARGETS[0]]['rmse']:.2f}  "
+                          if trm else "")
+                skill = 1.0 - r / base_rmse
+                print(f"  [{ep:02d}] loss={tr:.3f}  {tr_str}VAL {fmt(val)} skill={skill:+.3f}{flag}")
+                if bad >= args.patience:
+                    print(f"  early stop"); break
+            model.load_state_dict(best_state)
+            sfinal, P, T = evaluate(model, va_loader, tmean, tstd, tta=not args.no_tta,
+                                    return_preds=True)
+            seed_P.append(P)
+            if args.seeds > 1:
+                print(f"  seed {seed + 1}: {fmt(sfinal)} "
+                      f"skill={1.0 - sfinal[TARGETS[0]]['rmse'] / base_rmse:+.3f}")
+        # ensemble = mean prediction across seeds (in ug/m3 space; P is already
+        # de-standardized and exponentiated by evaluate)
+        P = np.mean(seed_P, axis=0)
+        final = metrics_from_preds(P, T)
         skill = 1.0 - final[TARGETS[0]]["rmse"] / base_rmse
-        print(f"  FINAL [{val_fold}]: {fmt(final)}  SKILL vs train-mean = {skill:+.3f}\n")
-        cv[val_fold] = {"metrics": final, "best_rmse": best, "baseline_rmse": base_rmse,
-                        "skill": skill, "n_train": len(train_df), "n_val": len(val_df),
+        tag = f"ENSEMBLE of {args.seeds} seeds" if args.seeds > 1 else "FINAL"
+        print(f"  {tag} [{val_fold}]: {fmt(final)}  SKILL vs train-mean = {skill:+.3f}\n")
+        cv[val_fold] = {"metrics": final, "baseline_rmse": base_rmse,
+                        "skill": skill, "n_seeds": args.seeds,
+                        "n_train": len(train_df), "n_val": len(val_df),
                         "s5p_linear_baseline": lin}
         pooled_p.append(P); pooled_t.append(T)
         scatter.append(pd.DataFrame({"fold": val_fold, "pred": P[:, 0], "true": T[:, 0]}))
