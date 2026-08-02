@@ -11,6 +11,28 @@ Streams:
     regional atmospheric field carries exactly the between-Land signal that
     held-out-Land CV demands.
 
+CHANGES vs previous version:
+  1. SKILL SCORE. Negative per-fold R2 compares against the val Land's own mean --
+     an oracle unavailable in deployment. The deployable reference is the TRAIN
+     mean; skill = 1 - RMSE_model / RMSE_trainmean is reported per fold and
+     averaged. Skill > 0 is the honest "beats predicting the mean" claim (both
+     recent runs already have it). Skill is also comparable across different
+     --smooth-km settings, unlike raw RMSE (heavier smoothing shrinks target
+     variance, deflating RMSE without the model being any better -- do NOT
+     compare raw RMSE across runs with different smoothing radii).
+  2. S5P SKIP CONNECTION. The raw z-scored scalars are concatenated directly
+     into the head input alongside the MLP features, so the model can represent
+     the linear solution (which beats the train mean on its own) without pushing
+     2 numbers through BN + dropout.
+  3. OVERFITTING DEFAULTS. Best val at epoch ~4 with train R2 still climbing =
+     overfitting on the now-learnable target. lr-head 1e-3 -> 3e-4, patience
+     20 -> 10. If the very-early-peak persists, lower --epochs too: the cosine
+     schedule anneals over --epochs, so a 70-epoch schedule never cools down for
+     a model that peaks at 5.
+  4. WIDE S5P STREAM (--s5p-wide no2 aer). Expects <name>_tropomi_wide/<loc>.npy
+     coarse grids (any HxW, e.g. 15x15 over ~100 km), one channel per stream,
+     z-scored on train pixel stats. Same rot/flip TTA and augmentation as the
+     S2 streams. Sensors missing a wide patch are dropped when the flag is on.
 
 Label-quality tools (binding constraint measured at sigma_sensor ~3.3 ug/m3):
   --grid-km K / --smooth-km R / --outlier-mad M / --weight-mode reliability
@@ -36,6 +58,12 @@ FOLD_DIR = PROC / "corrected" / "fold"
 HIGH_RES = SAT_DIR / "high_res_multispec"
 LOW_RES = SAT_DIR / "low_res_multispec"
 SENSOR_LAND = PROC / "sensor_land.csv"
+# UBA reference stations: patches mirror the sensor layout under a separate root
+SAT_UBA_DIR = PROC / "satellite_uba"
+UBA_DAILY = PROC / "daily_avg" / "uba" / "pm_reference_stations_{year}.csv"
+STATION_LAND = PROC / "uba" / "station_land.csv"
+UBA_REF_COL = {"PM10_corrected": "PM10", "PM2.5_corrected": "PM2.5"}
+UBA_MIN_DAYS = 182            # same completeness bar as the sensor pipeline
 
 # resolved at runtime from --s5p / --s5p-wide
 S5P_STREAMS = []
@@ -87,10 +115,11 @@ def compute_s5p_stats(frame):
     """Scalar streams: mean/std of the patch mean. Wide streams: mean/std over
     ALL pixels of the train patches. Train-only -> no leakage."""
     stats = {}
+    srcs = frame["source"].values if "source" in frame.columns else ["sensor"] * len(frame)
     for st in S5P_STREAMS:
         vals = []
-        for loc in frame["loc_str"]:
-            f = S5P_DIRS[st] / f"{loc}.npy"
+        for loc, so in zip(frame["loc_str"], srcs):
+            f = dirs_for(so)[2][st] / f"{loc}.npy"
             if f.exists():
                 vals.append(float(np.nanmean(np.load(f).astype("float32"))))
         vals = np.array(vals, dtype="float32")
@@ -98,8 +127,8 @@ def compute_s5p_stats(frame):
                      float(vals.std()) if len(vals) else 1.0)
     for st in WIDE_STREAMS:
         px = []
-        for loc in frame["loc_str"]:
-            f = WIDE_DIRS[st] / f"{loc}.npy"
+        for loc, so in zip(frame["loc_str"], srcs):
+            f = dirs_for(so)[3][st] / f"{loc}.npy"
             if f.exists():
                 a = np.load(f).astype("float32").ravel()
                 px.append(a[np.isfinite(a)])
@@ -110,10 +139,11 @@ def compute_s5p_stats(frame):
 
 def s5p_scalar_table(frame):
     out = {}
+    srcs = frame["source"].values if "source" in frame.columns else ["sensor"] * len(frame)
     for st in S5P_STREAMS:
         vals = []
-        for loc in frame["loc_str"]:
-            f = S5P_DIRS[st] / f"{loc}.npy"
+        for loc, so in zip(frame["loc_str"], srcs):
+            f = dirs_for(so)[2][st] / f"{loc}.npy"
             vals.append(float(np.nanmean(np.load(f).astype("float32"))) if f.exists() else np.nan)
         out[st] = np.array(vals, dtype="float64")
     return out
@@ -193,6 +223,13 @@ def aggregate_to_grid(frame, km):
 
 
 def remove_outlier_sensors(frame, radius_km=2.0, mad_mult=2.5, min_neighbors=2):
+    """QC for citizen sensors only -- UBA reference stations are never judged or
+    dropped (they are the ground truth this filter is implicitly appealing to)."""
+    if "source" in frame.columns and (frame["source"] == "uba").any():
+        uba = frame[frame["source"] == "uba"]
+        kept = remove_outlier_sensors(frame[frame["source"] == "sensor"].reset_index(drop=True),
+                                      radius_km, mad_mult, min_neighbors)
+        return pd.concat([kept, uba], ignore_index=True)
     xy = np.stack(to_km_xy(frame["lat"].values, frame["lon"].values), axis=1)
     y = frame[TARGETS[0]].values.astype("float64")
     nbrs = [[] for _ in range(len(xy))]
@@ -211,19 +248,37 @@ def remove_outlier_sensors(frame, radius_km=2.0, mad_mult=2.5, min_neighbors=2):
     return frame[~bad].reset_index(drop=True)
 
 
-def smooth_labels(frame, radius_km=10.0, d0_km=1.0):
+def smooth_labels(frame, radius_km=10.0, d0_km=1.0, uba_anchor_weight=1.0):
+    """IDW label smoothing. Two UBA-specific rules:
+      - UBA rows keep their own labels untouched (they are the reference, and a
+        reference measurement should never be pulled toward noisy neighbours).
+      - UBA neighbours can be up-weighted by uba_anchor_weight when smoothing
+        SENSOR labels, which pins the field's level to reference measurements
+        instead of letting it float on citizen-sensor offsets.
+    Still called per split, so val-Land measurements never enter train labels."""
     xy = np.stack(to_km_xy(frame["lat"].values, frame["lon"].values), axis=1)
     y = frame[TARGETS[0]].values.astype("float64")
+    is_uba = ((frame["source"] == "uba").values if "source" in frame.columns
+              else np.zeros(len(frame), bool))
+    mult = np.where(is_uba, float(uba_anchor_weight), 1.0)
     w0 = 1.0 / d0_km
-    wsum = np.full(len(xy), w0); ysum = y * w0; kcnt = np.ones(len(xy), dtype=int)
+    wsum = w0 * mult.copy(); ysum = y * w0 * mult; kcnt = np.ones(len(xy), dtype=int)
     for i, j, d in _pairwise_within(xy, radius_km):
         w = 1.0 / (d + d0_km)
-        np.add.at(wsum, i, w); np.add.at(ysum, i, w * y[j]); np.add.at(kcnt, i, 1)
-        np.add.at(wsum, j, w); np.add.at(ysum, j, w * y[i]); np.add.at(kcnt, j, 1)
-    out = frame.copy(); out[TARGETS[0]] = ysum / wsum; out["k_smooth"] = kcnt
+        np.add.at(wsum, i, w * mult[j]); np.add.at(ysum, i, w * mult[j] * y[j])
+        np.add.at(kcnt, i, 1)
+        np.add.at(wsum, j, w * mult[i]); np.add.at(ysum, j, w * mult[i] * y[i])
+        np.add.at(kcnt, j, 1)
+    sm = ysum / wsum
+    out = frame.copy()
+    out[TARGETS[0]] = np.where(is_uba, y, sm)      # UBA labels preserved exactly
+    out["k_smooth"] = kcnt
     q = np.percentile(kcnt, [10, 50, 90])
+    extra = (f", {int(is_uba.sum())} UBA labels left raw"
+             f"{f' (anchor x{uba_anchor_weight:g})' if uba_anchor_weight != 1 else ''}"
+             if is_uba.any() else "")
     print(f"  smoothing (r={radius_km:g} km): k p10/50/90 = "
-          f"{int(q[0])}/{int(q[1])}/{int(q[2])}, {int((kcnt==1).sum())} self-only")
+          f"{int(q[0])}/{int(q[1])}/{int(q[2])}, {int((kcnt==1).sum())} self-only{extra}")
     return out
 
 
@@ -233,6 +288,23 @@ def local_density(frame, radius_km=5.0):
     for i, j, _ in _pairwise_within(xy, radius_km):
         np.add.at(dens, i, 1.0); np.add.at(dens, j, 1.0)
     return dens
+
+
+def apply_uba_weight(frame, uba_weight):
+    """Multiply UBA rows' loss weight, then renormalize to mean 1 so the effective
+    learning rate does not change with the multiplier."""
+    if "source" not in frame.columns or uba_weight == 1.0:
+        return frame
+    f = frame.copy()
+    is_uba = (f["source"] == "uba").values
+    if not is_uba.any():
+        return f
+    f["w"] = f["w"].values * np.where(is_uba, uba_weight, 1.0)
+    f["w"] = f["w"] / f["w"].mean()
+    share = f.loc[is_uba, "w"].sum() / f["w"].sum()
+    print(f"  UBA weight x{uba_weight:g}: {int(is_uba.sum())} stations carry "
+          f"{share:.1%} of total training weight ({int((~is_uba).sum())} sensors carry the rest)")
+    return f
 
 
 def attach_weights(frame, mode, density_radius=5.0):
@@ -255,18 +327,35 @@ def attach_weights(frame, mode, density_radius=5.0):
     return f
 
 
-def patches_exist(loc):
-    if not ((HIGH_RES / f"{loc}.npy").exists() and (LOW_RES / f"{loc}.npy").exists()):
+def dirs_for(source):
+    """Patch directories for a row's source. UBA station patches live under
+    satellite_uba/ with identical stream sub-folder names, so both sources go
+    through exactly the same loading and normalization code."""
+    if source == "uba":
+        root = SAT_UBA_DIR
+        return (root / "high_res_multispec", root / "low_res_multispec",
+                {st: root / st for st in S5P_STREAMS},
+                {st: root / f"{st}_wide" for st in WIDE_STREAMS})
+    return HIGH_RES, LOW_RES, S5P_DIRS, WIDE_DIRS
+
+
+def patches_exist(loc, source="sensor"):
+    hi_d, lo_d, s5_d, wd_d = dirs_for(source)
+    if not ((hi_d / f"{loc}.npy").exists() and (lo_d / f"{loc}.npy").exists()):
         return False
-    if not all((S5P_DIRS[st] / f"{loc}.npy").exists() for st in S5P_STREAMS):
+    if not all((s5_d[st] / f"{loc}.npy").exists() for st in S5P_STREAMS):
         return False
-    return all((WIDE_DIRS[st] / f"{loc}.npy").exists() for st in WIDE_STREAMS)
+    return all((wd_d[st] / f"{loc}.npy").exists() for st in WIDE_STREAMS)
 
 
 def filter_to_available(frame):
-    keep = frame["loc_str"].map(patches_exist).values
-    if (~keep).sum():
-        print(f"  {int((~keep).sum())} of {len(frame)} sensors missing patches, dropped")
+    keep = np.array([patches_exist(l, s) for l, s in
+                     zip(frame["loc_str"], frame["source"])])
+    for src_name in frame["source"].unique():
+        m = (frame["source"] == src_name).values
+        missing = int((~keep & m).sum())
+        if missing:
+            print(f"  {src_name}: {missing} of {int(m.sum())} missing patches, dropped")
     return frame[keep].reset_index(drop=True)
 
 
@@ -304,7 +393,59 @@ def build_labeled_frame(require_coords):
         for t in TARGETS:
             out = out[out[t] > 0]; out[t] = np.log(out[t].values)
     out["loc_str"] = out["location"].map(_canon_loc)
+    out["source"] = "sensor"
     return out.reset_index(drop=True)
+
+
+def build_uba_frame(year=2024):
+    """Annual means at UBA reference stations, same schema as the sensor frame.
+
+    These are regulatory-grade measurements: at annual-mean scale their error is
+    negligible next to the citizen sensors' sigma ~3.3 ug/m3, which is why they
+    make a far cleaner validation target (and the assignment names UBA as the
+    calibration/validation anchor). Values are RAW reference concentrations --
+    reusing the '<pollutant>_corrected' column name only for schema
+    compatibility; nothing is calibrated here.
+
+    Sachsen-Anhalt stations are excluded exactly like Sachsen-Anhalt sensors.
+    """
+    path = Path(str(UBA_DAILY).format(year=year))
+    if not path.exists():
+        raise SystemExit(f"ERROR: missing {path} (the file the calibration script reads)")
+    ref_col = UBA_REF_COL.get(TARGETS[0])
+    if ref_col is None:
+        raise SystemExit(f"ERROR: no UBA reference column mapped for target {TARGETS[0]}")
+    df = pd.read_csv(path)
+    for need in ("station_code", "lat", "lon", ref_col):
+        if need not in df.columns:
+            raise SystemExit(f"ERROR: {path} missing column '{need}' (has {list(df.columns)})")
+    df[ref_col] = pd.to_numeric(df[ref_col], errors="coerce")
+    df = df.dropna(subset=[ref_col])
+    g = df.groupby("station_code")
+    ann = g[ref_col].mean().rename(TARGETS[0]).to_frame()
+    ann["n_days_total"] = g[ref_col].size()
+    ann[["lat", "lon"]] = g[["lat", "lon"]].median()
+    ann = ann.reset_index()
+    before = len(ann)
+    ann = ann[ann["n_days_total"] >= UBA_MIN_DAYS]
+    if not STATION_LAND.exists():
+        raise SystemExit(f"ERROR: missing {STATION_LAND} (needed to assign stations to folds)")
+    sl = pd.read_csv(STATION_LAND)[["station_code", "land"]]
+    ann = ann.merge(sl, on="station_code", how="inner")
+    ann = ann[ann["land"] != TEST_LAND]
+    ann["fold"] = ann["land"].map(LAND_TO_FOLD)
+    ann = ann.dropna(subset=["fold"])
+    if LOG_TARGET:
+        ann = ann[ann[TARGETS[0]] > 0].copy()
+        ann[TARGETS[0]] = np.log(ann[TARGETS[0]].values)
+    ann["location"] = ann["station_code"]
+    ann["loc_str"] = ann["station_code"].astype(str)
+    ann["source"] = "uba"
+    print(f"  UBA: {before} stations with data -> {len(ann)} after "
+          f"completeness (>={UBA_MIN_DAYS} d), {TEST_LAND} exclusion and fold mapping")
+    cols = ["location", "loc_str", "land", "fold", "lat", "lon", "n_days_total",
+            "source"] + TARGETS
+    return ann[cols].reset_index(drop=True)
 
 
 class PatchDataset(Dataset):
@@ -333,12 +474,13 @@ class PatchDataset(Dataset):
         if sh is not None: m = np.roll(m, sh, axis=(0, 1)).copy()
         return m > 0.5
 
-    def _load_wide(self, loc, k=0, f0=False, f1=False):
+    def _load_wide(self, loc, source="sensor", k=0, f0=False, f1=False):
         """(n_wide, H, W) z-scored on train pixel stats, nan->0. Same rot/flip
         as the S2 streams (no shift/gain: it's a coarse geographic field)."""
         chans = []
+        wd_d = dirs_for(source)[3]
         for st in WIDE_STREAMS:
-            a = np.load(WIDE_DIRS[st] / f"{loc}.npy").astype("float32")
+            a = np.load(wd_d[st] / f"{loc}.npy").astype("float32")
             m, sd = self.s5p_stats["wide:" + st]
             a = np.where(np.isfinite(a), (a - m) / sd, 0.0).astype("float32")
             if k: a = np.rot90(a, k).copy()
@@ -349,7 +491,9 @@ class PatchDataset(Dataset):
 
     def __getitem__(self, i):
         r = self.frame.iloc[i]; loc = r["loc_str"]
-        hi = np.load(HIGH_RES / f"{loc}.npy"); lo = np.load(LOW_RES / f"{loc}.npy")
+        source = r["source"] if "source" in r.index else "sensor"
+        hi_d, lo_d, s5_d, _ = dirs_for(source)
+        hi = np.load(hi_d / f"{loc}.npy"); lo = np.load(lo_d / f"{loc}.npy")
         hi_mask = ~np.isfinite(hi) | (hi <= 0); lo_mask = ~np.isfinite(lo) | (lo <= 0)
         k = 0; f0 = f1 = False
         if self.augment:
@@ -368,10 +512,10 @@ class PatchDataset(Dataset):
         xl = torch.from_numpy(normalize_patch(lo, lo_mask))
         s5p = []
         for st in S5P_STREAMS:
-            v = float(np.nanmean(np.load(S5P_DIRS[st] / f"{loc}.npy").astype("float32")))
+            v = float(np.nanmean(np.load(s5_d[st] / f"{loc}.npy").astype("float32")))
             m, sd = self.s5p_stats[st]; s5p.append((v - m) / sd if sd > 0 else 0.0)
         xs = torch.tensor(s5p, dtype=torch.float32)
-        xw = self._load_wide(loc, k, f0, f1) if WIDE_STREAMS else torch.zeros(0)
+        xw = self._load_wide(loc, source, k, f0, f1) if WIDE_STREAMS else torch.zeros(0)
         y = ((r[TARGETS].values.astype("float32") - self.tmean) / self.tstd).astype("float32")
         w = torch.tensor(float(r["w"]), dtype=torch.float32)
         return xh, xl, xs, xw, torch.from_numpy(y), w
@@ -526,7 +670,7 @@ def main():
     ap.add_argument("--lr-backbone", type=float, default=1e-5)
     ap.add_argument("--wd", type=float, default=5e-2)
     ap.add_argument("--wd-head", type=float, default=1e-3,
-                    help="separate weight decay for the head params; --wd still governs the backbone")
+                    help="separate weight decay for the head params; --wd governs the backbone")
     ap.add_argument("--head-dropout", type=float, default=0.4)
     ap.add_argument("--proj-dim", type=int, default=128)
     ap.add_argument("--folds", nargs="+", default=None)
@@ -535,6 +679,20 @@ def main():
                     help="scalar S5P streams: no2 aer co (must be fully downloaded)")
     ap.add_argument("--s5p-wide", nargs="+", default=[],
                     help="wide-context S5P streams; expects <name>_tropomi_wide/<loc>.npy grids")
+    ap.add_argument("--uba", action="store_true",
+                    help="include UBA reference stations: train on sensors + UBA, "
+                         "and validate on UBA stations of the held-out Land ONLY")
+    ap.add_argument("--uba-weight", type=float, default=10.0,
+                    help="loss weight multiplier for UBA rows in training (default 10)")
+    ap.add_argument("--uba-anchor-weight", type=float, default=1.0,
+                    help="weight of UBA neighbours when smoothing SENSOR labels "
+                         "(1 = no anchoring; try 10 to pin the field to references)")
+    ap.add_argument("--sensor-val", action="store_true",
+                    help="with --uba, validate on sensors as before instead of UBA-only")
+    ap.add_argument("--uba-only", action="store_true",
+                    help="train on UBA reference stations ONLY (drop all sensors); "
+                         "implies --uba. Isolates high-quality/low-coverage data so you "
+                         "can measure whether the noisy sensors add anything vs this.")
     ap.add_argument("--grid-km", type=float, default=0.0)
     ap.add_argument("--smooth-km", type=float, default=0.0)
     ap.add_argument("--outlier-mad", type=float, default=0.0)
@@ -563,7 +721,22 @@ def main():
     needs_coords = (bool(args.grid_km) or bool(args.smooth_km) or bool(args.outlier_mad)
                     or args.noise_ceiling or args.weight_mode == "density")
     print(f"device: {DEVICE}  |  scalar: {S5P_STREAMS}  |  wide: {WIDE_STREAMS or '-'}")
-    data = build_labeled_frame(require_coords=needs_coords)
+    if args.uba_only:
+        args.uba = True                       # --uba-only implies --uba
+    data = build_labeled_frame(require_coords=needs_coords or args.uba)
+    if args.uba:
+        uba = build_uba_frame()
+        common = [c for c in data.columns if c in uba.columns]
+        if args.uba_only:
+            data = uba[common].copy()         # references only, sensors dropped entirely
+            print(f"  UBA-ONLY: training on {len(data)} UBA stations, sensors excluded")
+        else:
+            data = pd.concat([data[common], uba[common]], ignore_index=True)
+            print(f"  combined frame: {int((data['source']=='sensor').sum())} sensors "
+                  f"+ {int((data['source']=='uba').sum())} UBA stations")
+        _u = uba.iloc[0]["loc_str"] if len(uba) else "?"
+        _hd, _ld, _s5, _wd = dirs_for("uba")
+        print(f"  UBA patches expected e.g. {_hd / (_u + '.npy')}")
     if args.noise_ceiling:
         rep = noise_ceiling_report(data)
         Path("noise_ceiling.json").write_text(json.dumps(rep, indent=2))
@@ -581,13 +754,31 @@ def main():
         print(f"########## VALIDATION FOLD: {val_fold} ##########")
         train_df = data[data["fold"] != val_fold].copy()
         val_df = data[data["fold"] == val_fold].copy()
+        if args.uba and not args.sensor_val:
+            # Validate on reference stations only: their annual means are
+            # essentially noise-free, so this measures spatial generalization
+            # rather than the citizen sensors' sigma ~3.3 ug/m3 measurement error.
+            val_df = val_df[val_df["source"] == "uba"].copy()
+            if len(val_df) < 10:
+                print(f"  SKIPPING {val_fold}: only {len(val_df)} UBA stations "
+                      f"(too few for a meaningful fold)")
+                continue
+            print(f"  validation set: {len(val_df)} UBA stations (sensors excluded)")
+        if args.smooth_km:
+            print("  train:", end=" ")
+            train_df = smooth_labels(train_df, args.smooth_km,
+                                     uba_anchor_weight=args.uba_anchor_weight)
+            if (val_df["source"] == "uba").all():
+                print("  val:   UBA-only -> labels kept raw (reference measurements)")
+            else:
+                print("  val:  ", end=" ")
+                val_df = smooth_labels(val_df, args.smooth_km,
+                                       uba_anchor_weight=args.uba_anchor_weight)
         if args.grid_km:
             print("  train:", end=" "); train_df = aggregate_to_grid(train_df, args.grid_km)
             print("  val:  ", end=" "); val_df = aggregate_to_grid(val_df, args.grid_km)
-        if args.smooth_km:
-            print("  train:", end=" "); train_df = smooth_labels(train_df, args.smooth_km)
-            print("  val:  ", end=" "); val_df = smooth_labels(val_df, args.smooth_km)
         train_df = attach_weights(train_df, args.weight_mode, args.density_radius)
+        train_df = apply_uba_weight(train_df, args.uba_weight if args.uba else 1.0)
         val_df = attach_weights(val_df, "none")
         tmean = train_df[TARGETS].values.mean(0).astype("float32")
         tstd = train_df[TARGETS].values.std(0).astype("float32")
@@ -652,12 +843,22 @@ def main():
         print(f"  FINAL [{val_fold}]: {fmt(final)}  SKILL vs train-mean = {skill:+.3f}\n")
         cv[val_fold] = {"metrics": final, "best_rmse": best, "baseline_rmse": base_rmse,
                         "skill": skill, "n_train": len(train_df), "n_val": len(val_df),
+                        "n_train_uba": int((train_df["source"] == "uba").sum()),
+                        "val_source": "uba" if (val_df["source"] == "uba").all() else "mixed",
                         "s5p_linear_baseline": lin}
         pooled_p.append(P); pooled_t.append(T)
         scatter.append(pd.DataFrame({"fold": val_fold, "pred": P[:, 0], "true": T[:, 0]}))
 
     print("=" * 70); print("CROSS-VALIDATION SUMMARY")
     folds_done = [f for f in cv if not f.startswith("_")]
+    if not folds_done:
+        print("  NO folds completed. If every UBA station was dropped as "
+              "'missing patches',\n  the UBA patch files are not where the trainer "
+              "looks. Expected:\n    satellite_uba/{high_res_multispec,low_res_multispec"
+              ",<s5p streams>}/<station_code>.npy\n  Check the folder names, the "
+              "<station_code>.npy filenames, and that the S5P\n  streams were "
+              "downloaded to the satellite_uba/ root (not satellite/).")
+        return
     for t in TARGETS:
         rmse = np.mean([cv[f]["metrics"][t]["rmse"] for f in folds_done])
         r2 = np.mean([cv[f]["metrics"][t]["r2"] for f in folds_done])
