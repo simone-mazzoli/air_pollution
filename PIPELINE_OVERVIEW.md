@@ -1,79 +1,133 @@
 # Pipeline Overview
 
-## Current repository structure
+This file explains the workflow in the order we usually think about it. The
+main idea is:
 
-| Path | Purpose 
-| --- | --- 
-| `01_scripts_gathering/` | Download Sensor.Community archives and UBA reference data. 
-| `02_scripts_cleaning/` | Clean raw sensor archives and aggregate PM, humidity, and UBA data. 
-| `03_scripts_calibration/` | Validate hourly data, calibrate low-cost PM, and create spatial splits. 
-| `04_GEE/` | Download and inspect Sentinel-2 Earth Engine patches. 
-| `05_scripts_visual/` | Optional diagnostic maps for sensor/reference coverage. 
-| `06_models/02_resnet/` | Current pretrained ResNet high-resolution image baseline. 
+```text
+ground measurements + satellite patches -> model -> pollution estimates in new places
+```
 
-## End-to-end flow
+The repository is still a research project, so some stages are finished, some
+are experimental, and some are plans.
 
-1. Download Sensor.Community monthly ZIP archives for PM and humidity/weather sensor types.
-2. Fetch UBA station metadata and daily PM10/PM2.5 reference measurements.
-3. Clean Sensor.Community PM readings into hourly, daily, and monthly PM aggregates.
-4. Clean humidity/weather readings into hourly, daily, and monthly humidity aggregates, including clipped-humidity features.
-5. Aggregate UBA daily PM reference data into monthly station means.
-6. Resolve UBA stations and low-cost sensors to German states.
-7. Calibrate low-cost PM to UBA reference distributions and write annual corrected sensor targets.
-8. Download annual Sentinel-2 median composite patches for calibrated sensor locations.
-9. Validate and normalize image patches.
-10. Train the current high-resolution ResNet baseline over non-test held-out folds.
+## 1. Input Data
 
-## Main external datasets
+| Input | Folder/script | Output | Status |
+| --- | --- | --- | --- |
+| Sensor.Community monthly ZIP files | `01_scripts_gathering/sensors-related/01_sensor_community_all_sensors.py` | `data/raw/<YYYY-MM>/<YYYY-MM>_<sensor_type>.zip` | implemented |
+| UBA station metadata | `01_scripts_gathering/sensors-related/02_uba_stations_metadata.py` | `data/processed/uba_stations_germany.csv` | implemented |
+| UBA daily PM measurements | `01_scripts_gathering/sensors-related/03_download_uba_measurements.py` | `data/processed/daily_avg/uba/pm_reference_stations_2024.csv` | implemented |
+| EEA PM data | `01_scripts_gathering/get_eea_pm.py` | `data/processed/eea/airbase_raw/` | experimental |
+| HYRAS weather | `01_scripts_gathering/download_extract_hyras.py` | `data/processed/daily_weather/hyras_2024_sds011.parquet` | experimental, used for weather diagnostics |
 
-- Sensor.Community monthly CSV archives from `https://archive.sensor.community/csv_per_month/`.
-- UBA air-quality station and measurement APIs.
-- German state boundary GeoJSON from `isellsoap/deutschlandGeoJSON`, cached as `data/processed/germany_states.geojson`.
-- Google Earth Engine Sentinel-2 Surface Reflectance Harmonized collection `COPERNICUS/S2_SR_HARMONIZED`.
-- BIFOLD BigEarthNet ResNet50 model metadata and weights from Hugging Face, plus ConfigILM normalization constants.
+UBA stations are official German reference stations. We use them because their
+measurements are much more reliable than low-cost sensors. Sensor.Community
+gives many more locations, but the PM sensors are noisy.
 
-## Implementation status
+## 2. Cleaning And Aggregation
 
-| Stage | Current status |
-| --- | --- |
-| Sensor.Community download | Implemented for 2024 monthly ZIPs with resume and validation. |
-| UBA reference retrieval | Implemented for 2024 station metadata and daily PM10/PM2.5 measurements. |
-| PM cleaning | Implemented for hourly/daily/monthly aggregation with coverage and plausibility filters. |
-| Humidity cleaning | Implemented for hourly/daily/monthly aggregation and clipped relative humidity features. |
-| UBA monthly aggregation | Implemented. |
-| UBA station state assignment | Implemented, including coordinate fallback for federal/non-state-coded stations. |
-| Low-cost PM calibration | Implemented as the established percentile/range-mapping branch plus an isolated regression reference-adjustment alternative. |
-| Sensor state assignment | Implemented from SDS011 node coordinates with polygon assignment, 1 km boundary fallback, and outside-Germany exclusion. |
-| Coverage and distance diagnostics | Partially implemented; two diagnostic scripts have likely incorrect `BASE_DIR` path roots. |
-| Sentinel-2 patch download | Implemented for high-resolution and low-resolution multispectral streams. |
-| Patch validation/normalization | Implemented for preview grids and PyTorch dataset utilities. |
-| ResNet training | Partially implemented as a high-resolution PM10-only baseline. |
-| Final sealed Sachsen-Anhalt evaluation | Not implemented in the current code. |
-| Low-resolution/two-stream modeling | Not implemented in the current trainer. |
-| Continuous pollution mapping | Not implemented in the current code. |
-| Environmental-justice analysis | Not implemented in the current code. |
+| Step | Folder/script | Output | Status |
+| --- | --- | --- | --- |
+| Clean PM sensors | `02_scripts_cleaning/sensors-related/01_process_pm_sensors.py` | hourly parquet files, daily CSVs, monthly CSVs | implemented |
+| Clean humidity sensors | `02_scripts_cleaning/sensors-related/02_process_humidity_sensors.py` | hourly/daily/monthly humidity tables | implemented |
+| Aggregate UBA PM by month | `02_scripts_cleaning/sensors-related/03_aggregate_uba_monthly.py` | `data/processed/monthly_avg/uba/pm_reference_stations_<YYYY-MM>.csv` | implemented |
+| Assign UBA stations to states | `02_scripts_cleaning/sensors-related/04_locate_DEUB_UBA_stations.py` | `data/processed/uba/station_land.csv` | implemented |
 
-## Train/validation/test logic
+Annual aggregation means averaging daily values into one value per location for
+the year. The current code uses 2024.
 
-The current code treats `Sachsen-Anhalt` as the sealed CNN test Land. In `03_scripts_calibration/03_calibrate_pm_loo.py`, Sachsen-Anhalt UBA stations are excluded from calibration, and Sachsen-Anhalt sensors are excluded from non-test fold outputs if `data/processed/sensor_land.csv` exists. A separate `Sachsen-Anhalt_TEST` annual file can be produced using coefficients fit only on non-Sachsen-Anhalt data.
+## 3. Reference And Sensor Labels
 
-The alternative regression calibration lives under `03_scripts_calibration/regression_reference_adjustment/` and prepares corrected annual PM labels only. It evaluates OLS and Huber fits over non-Sachsen-Anhalt inner folds, selects a method/radius from those folds, then fits final PM10 and PM2.5 equations on all non-Sachsen-Anhalt data. The same final coefficients are applied to non-Sachsen-Anhalt CNN training labels and Sachsen-Anhalt test labels. The 2024 audit recommends the shared OLS 20 km label set, while documenting that the global affine fits substantially compress annual target variation.
+| Step | Folder/script | Output | Status |
+| --- | --- | --- | --- |
+| Assign Sensor.Community sensors to states | `03_scripts_calibration/active/04_resolve_sensor_land.py` | `data/processed/sensor_land.csv` | implemented |
+| Build current annual proxy labels | `03_scripts_calibration/active/03_calibrate_pm_loo.py` | `data/processed/corrected/fold/*/annual/2024.csv` | implemented |
+| Summarize sensor calibration experiments | `03_scripts_calibration/build_sensor_calibration_summary.py` | `03_scripts_calibration/sensor_community_calibration_summary.csv` | implemented |
 
-For cross-validation, German states are mapped into fold groups by `LAND_TO_FOLD`. Some folds combine states, such as Berlin-Brandenburg, Bremen-Niedersachsen, Hamburg-Schleswig-Holstein, and Saarland-Rheinland-Pfalz. The current ResNet script trains on ten non-test folds and validates on the held-out non-test fold, then averages metrics across folds that are run.
+Calibration means trying to correct a sensor so that its values match a trusted
+reference measurement. We tested several Sensor.Community calibration ideas
+because those sensors cover many more places than UBA stations. The result was
+mostly negative: the tested methods did not give reference-quality annual
+labels. See
+[03_scripts_calibration/SENSOR_COMMUNITY_CALIBRATION_SUMMARY.md](03_scripts_calibration/SENSOR_COMMUNITY_CALIBRATION_SUMMARY.md).
 
-The final sealed Sachsen-Anhalt model evaluation is described by the split design but is not implemented in the current repository state.
+Spatial folds are geographic train/validation splits. Here, German states are
+grouped into folds, and `Sachsen-Anhalt` is treated as the sealed test state in
+the current sensor-label workflow. The final reference-station validation design
+is still being evaluated.
 
-## Important inconsistencies and caveats
+## 4. Satellite Patch Collection
 
-- `03_scripts_calibration/01_validate_new_months.py` and `03_scripts_calibration/02_radius_distance_ablation.py` appear to point at `03_scripts_calibration/data/processed` instead of root `data/processed`.
-- `05_scripts_visual` expects older PM merged filenames. Current PM cleaning writes `data/processed/monthly_avg/all_pm_sensors/<YYYY-MM>.csv`.
-- Several docstrings and comments outside the refreshed calibration docs may still reference old script names, including `fetch_satellite.py`, `visualize_patches.py`, `get_uba_stations.py`, `correct_pm.py`, and `calibrate_pm.py`.
-- `06_models/02_resnet/03_train_resnet.py` currently trains only `PM10_corrected`, although its docstring still describes two-output PM10/PM2.5 regression.
-- `requirements.txt` appears to be a captured `pip freeze` with a shell prompt line at the top, not a minimal clean dependency manifest.
-- A Python bytecode cache file under `03_scripts_calibration/__pycache__/` and ResNet debug images/results are tracked.
+| Step | Folder/script | Output | Status |
+| --- | --- | --- | --- |
+| Download Sentinel-2 patches for sensor labels | `04_GEE/01_download_satellite_patches.py` | `data/processed/satellite/high_res_multispec/*.npy`, `low_res_multispec/*.npy`, `manifest.csv` | implemented |
+| Inspect downloaded patches | `04_GEE/02_inspect_patches.py` | `data/processed/satellite/preview_patches.png` | implemented |
+| Download Sentinel-5P sensor patches | `04_GEE/03_download_s5p_patches.py` | S5P patch arrays under `data/processed/satellite/` | experimental |
+| Download national Sentinel-5P rasters/crops | `04_GEE/04_download_s5p_nation.py` | national rasters and cropped arrays | experimental |
+| Download Sentinel-2 patches for UBA stations | `04_GEE/05_download_satellite_patches_uba.py` | station-centered Sentinel-2 arrays | implemented/experimental |
+| Download Sentinel-5P patches for UBA stations | `04_GEE/06_download_s5p_patches_uba.py` | station-centered S5P arrays | experimental |
 
-## Paths and credentials
+Sentinel-2 gives local visual context such as land cover, roads, vegetation, and
+urban structure. Sentinel-5P is coarser but measures atmospheric products such
+as NO2. Earth Engine scripts require Google Earth Engine access. If
+`client_id_GEE.txt` exists at the repository root and contains a service-account
+JSON key, the scripts use it; otherwise they try interactive Earth Engine login.
 
-Most scripts build paths relative to the repository root and read or write under `data/processed` or `data/raw`. The `.gitignore` excludes `data/`, `papers/`, `task/`, `venv/`, `.vscode/`, and `client_id_GEE.txt`.
+These scripts can create many `.npy` files and may take a long time.
 
-`client_id_GEE.txt` is expected at the repository root if a Google Earth Engine service account JSON key is used. It is ignored by git in the current `.gitignore`.
+## 5. Model Training
+
+| Step | Folder/script | Output | Status |
+| --- | --- | --- | --- |
+| Inspect normalization constants | `06_models/02_resnet/01_find_stats.py` | printed band order and mean/std values | utility |
+| Normalize/check patches | `06_models/02_resnet/02_sat_normalize.py` | debug patch grids | implemented |
+| Train ResNet baseline | `06_models/02_resnet/03_train_resnet.py` | `resnet_cv_results.json`, predictions CSVs | implemented baseline |
+
+The current trainer uses high-resolution Sentinel-2 patches and predicts
+`PM10_corrected`. It does not yet represent the final modeling direction. The
+next modeling question is whether training on official reference measurements,
+with Sensor.Community possibly added as weak labels, improves performance on
+held-out reference stations.
+
+## 6. Geographic Validation
+
+Geographic validation means training in some places and validating somewhere
+else. This matters because air pollution has strong spatial patterns. Randomly
+splitting nearby locations can make results look better than they really are.
+
+Current code supports state-based folds for the sensor-label pipeline. A final
+reference-station validation setup is still a project decision, not a finished
+result.
+
+## 7. Final Grid Prediction
+
+Planned. The idea is to run a trained model across a regular grid of locations
+so we can produce a pollution surface instead of predictions only at known
+stations or sensors.
+
+## 8. Comparison With EEA Grid
+
+Planned/experimental. The EEA data scripts are present, but the repository does
+not yet contain a completed comparison workflow.
+
+## 9. Socioeconomic Analysis
+
+Planned/early. There is a preliminary INKAR socioeconomic download script in
+`01_scripts_gathering/sensors-related/05_get_socioeconomic_data_PRELIMINARY.py`.
+Treat it as exploratory until the analysis design is clearer.
+
+## Data Location Reminder
+
+Most scripts look for `data/` at the repository root. `data/` can be a real
+folder or a symlink to an external drive. The repository ignores that directory,
+so team members need to get or generate their own local data.
+
+## Main Known Gaps
+
+- The exact final reference-station training and validation setup is still being
+  evaluated.
+- The current ResNet script trains PM10 only.
+- The low-resolution stream, Sentinel-5P streams, and final map prediction are
+  not fully integrated into the main trainer.
+- `05_scripts_visual/` still expects an older monthly PM filename and may need a
+  small path update before use.

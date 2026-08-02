@@ -1,5 +1,5 @@
 """
-Sanity-check newly received hourly data before running calibrate_pm_leave_one_fold_out.py.
+Sanity-check newly received hourly data before running active/03_calibrate_pm_loo.py.
 
 Checks, per month found in data/processed/hourly/pm/all_pm_sensors/:
   1. All four required files exist (pm/all_pm_sensors, pm/nodes, humidity/all_sensors,
@@ -12,7 +12,7 @@ Checks, per month found in data/processed/hourly/pm/all_pm_sensors/:
   5. Node/location coverage is the same order of magnitude as your own months (catches
      a teammate accidentally processing a tiny subset).
 
-Run this BEFORE calibrate_pm_leave_one_fold_out.py -- that script now refits 12x
+Run this BEFORE active/03_calibrate_pm_loo.py -- that script now refits 12x
 instead of once, so catching a bad month here is much cheaper than after a long run.
 """
 
@@ -21,7 +21,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parents[3]
 PROC = BASE_DIR / "data" / "processed"
 
 PM_HOURLY_DIR = PROC / "hourly" / "pm" / "all_pm_sensors"
@@ -160,7 +160,7 @@ def main():
     print("\n" + ("Some issues found above -- review before running the "
                   "12-fold calibration." if any_problems else
                   "All checks passed. Safe to proceed to "
-                  "calibrate_pm_leave_one_fold_out.py."))
+                  "active/03_calibrate_pm_loo.py."))
 
 
 if __name__ == "__main__":

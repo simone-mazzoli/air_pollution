@@ -821,7 +821,7 @@ def main() -> None:
         raise AssertionError(f"{calib.TEST_LAND} leaked into sensitivity results")
     out_path = out_dir / "results.csv"
     results.to_csv(out_path, index=False)
-    command = "python3 -B 03_scripts_calibration/regression_reference_adjustment/fit_close_reference_weather_models.py"
+    command = "python3 -B 03_scripts_calibration/experiments/nearby_reference_regression/fit_close_reference_weather_models.py"
     write_summary(out_dir, results, command)
     (out_dir / "run_info.txt").write_text(
         "\n".join(

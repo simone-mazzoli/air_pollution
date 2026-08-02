@@ -35,7 +35,7 @@ import numpy as np
 import pandas as pd
 
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parents[2]
 PROC = BASE_DIR / "data" / "processed"
 LAND_BOUNDARIES_PATH = PROC / "germany_states.geojson"
 OUT_PATH = PROC / "sensor_land.csv"

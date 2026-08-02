@@ -1,8 +1,7 @@
 """
 Representativeness-vs-distance diagnostic.
 
-we fit each sensor's (a,b) against its nearest station (as
-03_calibrate_pm.py does), then validate against its second-nearest
+we fit each sensor's (a,b) against its nearest station, then validate against its second-nearest
 station's actual daily values. Bin sensors by distance-to-nearest and watch holdout RMSE. If it stays
 flat out to large distances, a hard radius cutoff is unnecessary. If it rises sharply past some
 distance, that's empirical support for a cutoff near that point.
@@ -17,7 +16,7 @@ Input:  data/processed/hourly/pm/all_pm_sensors/<YYYY-MM>.parquet
         data/processed/hourly/pm/nodes/<type>_<YYYY-MM>.parquet
         data/processed/hourly/humidity/nodes/<type>_<YYYY-MM>.parquet
         data/processed/daily_avg/uba/pm_reference_stations_<YEAR>.csv
-        data/processed/calibration/global_kappa.json  (from calibrate_pm.py)
+        data/processed/calibration/global_kappa.json  (optional legacy input)
 Output: printed distance-bin table, plus
         data/processed/calibration/radius_diagnostic.csv (one row per bin)
 """
@@ -30,7 +29,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parents[3]
 PROC = BASE_DIR / "data" / "processed"
 
 PM_HOURLY_DIR = PROC / "hourly" / "pm" / "all_pm_sensors"
@@ -194,7 +193,7 @@ def run_diagnostic(months, year):
         print(f"Using fitted kappa from {GLOBAL_KAPPA_PATH.name}: {kappas}\n")
     else:
         print(f"No {GLOBAL_KAPPA_PATH.name} found -- using kappa=0 for all pollutants "
-              f"(run calibrate_pm.py first for a real kappa)\n")
+              f"(no legacy global_kappa.json found; using kappa=1.0)\n")
 
     daily_parts = []
     nodes_parts = []

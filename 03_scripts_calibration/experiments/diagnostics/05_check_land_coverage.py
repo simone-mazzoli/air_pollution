@@ -11,7 +11,7 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parents[3]
 PROC = BASE_DIR / "data" / "processed"
 GEOJSON_PATH = PROC / "germany_states.geojson"
 SENSOR_LAND_PATH = PROC / "sensor_land.csv"
@@ -20,7 +20,7 @@ CORR_FOLD_DIR = PROC / "corrected" / "fold"
 METRIC_CRS = "EPSG:3035"  # ETRS89-LAEA Europe -- equal-area, correct for this
 RADII_KM = [10, 15]
 
-# must match LAND_TO_FOLD in calibrate_pm_leave_one_fold_out.py exactly -- these
+# must match LAND_TO_FOLD in active/03_calibrate_pm_loo.py exactly -- these
 # are the fold groups the calibration was actually fit against
 LAND_TO_FOLD = {
     "Berlin": "Berlin-Brandenburg", "Brandenburg": "Berlin-Brandenburg",

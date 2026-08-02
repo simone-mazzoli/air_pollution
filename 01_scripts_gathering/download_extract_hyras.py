@@ -24,7 +24,7 @@ from pyproj import Transformer
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-REGRESSION_DIR = BASE_DIR / "03_scripts_calibration" / "regression_reference_adjustment"
+REGRESSION_DIR = BASE_DIR / "03_scripts_calibration" / "experiments" / "nearby_reference_regression"
 sys.path.insert(0, str(REGRESSION_DIR))
 
 import calibrate_pm_regression_loo as calib  # noqa: E402

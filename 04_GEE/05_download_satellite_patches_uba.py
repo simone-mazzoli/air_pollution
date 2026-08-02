@@ -9,7 +9,7 @@ Multispectral bands, cloud filtering, and coordinate handling are unchanged from
 download_satellite_patches.py -- see that script's docstring for the reasoning.
 
 Station coordinates come from the same UBA daily file
-calibrate_pm_leave_one_fold_out.py reads (station_code, lat, lon columns), not
+active/03_calibrate_pm_loo.py reads (station_code, lat, lon columns), not
 from station_land.csv -- station_land.csv only has station_code+land, no
 coordinates.
 
@@ -100,7 +100,7 @@ def init_ee():
 
 def load_locations():
     """UBA reference station coordinates -- same source file
-    calibrate_pm_leave_one_fold_out.py's load_uba() reads (station_code, lat, lon),
+    active/03_calibrate_pm_loo.py's load_uba() reads (station_code, lat, lon),
     deduplicated to one row per station_code."""
     path = Path(str(UBA_DAILY).format(year=YEAR))
     if not path.exists():

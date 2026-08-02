@@ -19,7 +19,7 @@ COMPOSITE: quality/cloud-filtered annual mean, same as the sensor version -- L3
 OFFL products are already ESA-quality-screened.
 
 Station coordinates come from the same UBA daily file
-calibrate_pm_leave_one_fold_out.py and download_satellite_patches_uba.py read
+active/03_calibrate_pm_loo.py and download_satellite_patches_uba.py read
 (station_code, lat, lon columns) -- not from the low-cost sensor annual files.
 
 Input:  client_id_GEE.txt
@@ -95,7 +95,7 @@ def init_ee():
 
 def load_locations():
     """UBA reference station coordinates -- same source file
-    calibrate_pm_leave_one_fold_out.py's load_uba() and
+    active/03_calibrate_pm_loo.py's load_uba() and
     download_satellite_patches_uba.py read (station_code, lat, lon)."""
     path = Path(str(UBA_DAILY).format(year=YEAR))
     if not path.exists():

@@ -26,7 +26,7 @@ import numpy as np, pandas as pd
 
 warnings.filterwarnings("ignore", category=pd.errors.PerformanceWarning)
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parents[2]
 PROC = BASE_DIR / "data" / "processed"
 PM_HOURLY_DIR = PROC / "hourly" / "pm" / "all_pm_sensors"
 NODES_DIR = PROC / "hourly" / "pm" / "nodes"

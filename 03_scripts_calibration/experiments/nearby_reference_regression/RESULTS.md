@@ -37,7 +37,7 @@ sensor-station rows for each radius, fold, and pollutant:
 - `Huber regression adjustment`
 
 The original percentile-mapping method was reproduced from
-`03_scripts_calibration/03_calibrate_pm_loo.py` inside the common corrected
+`03_scripts_calibration/active/03_calibrate_pm_loo.py` inside the common corrected
 SDS011-only fold harness. Existing percentile-output summary numbers were not
 used directly because the original script is not fully comparable: it currently
 uses a 12-hour daily threshold and does not filter `sensor_type` before daily
