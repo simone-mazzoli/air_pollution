@@ -18,9 +18,12 @@ The Earth Engine project id is currently hard-coded in the scripts as
 
 | Script | What it does | Main output |
 | --- | --- | --- |
-| `01_download_satellite_patches.py` | Downloads Sentinel-2 patches for Sensor.Community label locations. | `data/processed/satellite/high_res_multispec/*.npy`, `low_res_multispec/*.npy`, `manifest.csv` |
-| `02_inspect_patches.py` | Makes a preview image so we can quickly see whether downloaded patches look reasonable. | `data/processed/satellite/preview_patches.png` |
-| `05_download_satellite_patches_uba.py` | Downloads Sentinel-2 patches centered on UBA reference stations. | station-centered arrays under `data/processed/satellite/` |
+| `sensors-related/01_download_satellite_patches.py` | Downloads Sentinel-2 patches for Sensor.Community label locations. | `data/processed/satellite/high_res_multispec/*.npy`, `low_res_multispec/*.npy`, `manifest.csv` |
+| `sensors-related/02_inspect_patches.py` | Makes a preview image so we can quickly see whether downloaded patches look reasonable. | `data/processed/satellite/preview_patches.png` |
+| `sensors-related/05_download_satellite_patches_uba.py` | Downloads Sentinel-2 patches centered on UBA reference stations. | station-centered arrays under `data/processed/satellite/` |
+| `01_download_satellite_patches_eea.py` | Downloads Sentinel-2 and Sentinel-5P satellite patches per EEA station (one file per (station, stream) combination). | `data/processed/satellite_eea/<stream_folder>/<station_code>.npy` |
+
+
 
 Sentinel-2 is optical satellite imagery. We use it because local land cover,
 roads, vegetation, and urban structure can help predict pollution.
@@ -28,9 +31,10 @@ roads, vegetation, and urban structure can help predict pollution.
 ## Usual Commands
 
 ```bash
-python3 04_GEE/01_download_satellite_patches.py --limit 25
-python3 04_GEE/01_download_satellite_patches.py
-python3 04_GEE/02_inspect_patches.py --n 10
+python3 04_GEE/sensors-related/01_download_satellite_patches.py --limit 25
+python3 04_GEE/sensors-related/01_download_satellite_patches.py
+python3 04_GEE/sensors-related/02_inspect_patches.py --n 10
+python3 04_GEE/01_download_satellite_patches_eea.py --stream high_res low_res no2 aer co 
 ```
 
 Use `--limit` for a small test before starting a full download. A full run can

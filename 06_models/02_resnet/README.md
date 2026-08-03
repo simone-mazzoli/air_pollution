@@ -10,20 +10,21 @@ Run commands from the repository root.
 
 | Script | What it does | Main output |
 | --- | --- | --- |
-| `01_find_stats.py` | Prints the BigEarthNet band order and normalization constants. | terminal output |
-| `02_sat_normalize.py` | Loads patches, applies normalization, and can save debug preview images. | `debug_patches/` or a chosen preview image |
-| `03_train_resnet.py` | Trains the current PM10 ResNet baseline with state-based validation folds. | `resnet_cv_results.json` by default |
+| `sensors-related/01_find_stats.py` | Prints the BigEarthNet band order and normalization constants. | terminal output |
+| `sensors-related/02_sat_normalize.py` | Loads patches, applies normalization, and can save debug preview images. | `debug_patches/` or a chosen preview image |
+| `sensors-related/03_train_resnet.py` | Trains the current PM10 ResNet baseline with state-based validation folds. | `resnet_cv_results.json` by default |
+| `01_eea_s2p_normalizer.py` | normalizes existing EEA S2 patches and pairs them with per-station annual PM labels for model training. | none (in-memory `Dataset`; optional `debug_eea_patches.png` if run standalone) |
 
 ## Usual Commands
 
 ```bash
-python3 06_models/02_resnet/01_find_stats.py
+python3 06_models/02_resnet/sensors-related/01_find_stats.py
 
-python3 06_models/02_resnet/02_sat_normalize.py \
+python3 06_models/02_resnet/sensors-related/02_sat_normalize.py \
   --stream-dir data/processed/satellite/high_res_multispec \
   --locations-csv data/processed/corrected/fold/Bayern/annual/2024.csv
 
-python3 06_models/02_resnet/03_train_resnet.py --folds Bayern Hessen --epochs 20 --batch 32
+python3 06_models/02_resnet/sensors-related/03_train_resnet.py --folds Bayern Hessen --epochs 20 --batch 32
 ```
 
 The full trainer can take a while, especially if it downloads pretrained weights

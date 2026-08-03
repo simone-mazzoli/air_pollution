@@ -14,6 +14,8 @@ Run commands from the repository root.
 | `sensors-related/02_process_humidity_sensors.py` | Cleans humidity/weather sensors and creates hourly/daily/monthly humidity tables. | `data/processed/hourly/humidity/`, `data/processed/daily_avg/humidity/`, `data/processed/monthly_avg/humidity/` |
 | `sensors-related/03_aggregate_uba_monthly.py` | Aggregates daily UBA reference data to monthly station means. | `data/processed/monthly_avg/uba/pm_reference_stations_<YYYY-MM>.csv` |
 | `sensors-related/04_locate_DEUB_UBA_stations.py` | Assigns each UBA station to a German federal state. | `data/processed/uba/station_land.csv` |
+| `build_eea_pm_labels.py` | builds the EU-wide annual PM label file from the EEA raw parquet, one row per (station, valid day). | `data/processed/daily_avg/eea/pm_reference_stations_2024.csv` |
+
 
 ## Usual Order
 

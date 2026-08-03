@@ -12,6 +12,8 @@ Run commands from the repository root.
 | `sensors-related/01_sensor_community_all_sensors.py` | Monthly Sensor.Community ZIP archives for PM and humidity/weather sensors. | `data/raw/<YYYY-MM>/<YYYY-MM>_<sensor_type>.zip` |
 | `sensors-related/02_uba_stations_metadata.py` | UBA station metadata for stations inside Germany. | `data/processed/uba_stations_germany.csv` |
 | `sensors-related/03_download_uba_measurements.py` | Daily UBA PM10 and PM2.5 measurements for 2024. | `data/processed/daily_avg/uba/pm_reference_stations_2024.csv` |
+| `get_eea_pm.py` | Verified PM10/PM2.5 parquet files for EEA-reporting countries, via the `airbase` package. | `data/processed/eea/airbase_raw/<CC>/*.parquet` |
+| `count_eea_stations.py` | filters the downloaded EEA data to stations meeting a validity/completeness threshold. | `data/processed/eea/stations_to_download.csv` |
 
 UBA stations are official reference stations. Sensor.Community sensors are
 volunteer low-cost sensors. We download both because UBA is reliable and

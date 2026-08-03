@@ -2,7 +2,12 @@
 Download PM10/PM2.5 using the airbase package instead of the raw
 ParquetFile/async endpoint (much less time needed). airbase requests individual
 per-station parquet file URLs and downloads them concurrently.
+
+Input: fetches directly from the airbase/EEA API.
+Output: data/processed/eea/airbase_raw/CC/*.parquet
+where CC is equal to Country Code (one folder per country)
 """
+
 import argparse
 from pathlib import Path
 import airbase
@@ -14,7 +19,7 @@ def main():
     ap.add_argument("--country", nargs="+", default=None,
                      help="2-letter country codes; default: all EEA-reporting countries")
     ap.add_argument("--year", type=int, default=2024)
-    ap.add_argument("--out-dir", default="data/processed/eea/airbase_raw")
+    ap.add_argument("--out-dir", default=str(Path(__file__).resolve().parent.parent / "data/processed/eea/airbase_raw"))
     args = ap.parse_args()
 
     needed_cols = ["Samplingpoint", "Pollutant", "Start", "Value", "Validity"]
