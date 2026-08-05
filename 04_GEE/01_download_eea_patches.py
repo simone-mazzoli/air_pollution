@@ -5,8 +5,10 @@ Streams (choose any with --stream, gather across multiple days):
   high_res  Sentinel-2 multispectral, 120x120 @ 10 m/px  (1.2 km, local detail)
   low_res   Sentinel-2 multispectral, 60x60  @ 200 m/px  (12 km, wide context)
   no2       S5P tropospheric NO2 column, 5x5 @ 7 km/px    (35 km)
-  aer       S5P UV aerosol index,        5x5 @ 7 km/px
-  co        S5P CO column,               5x5 @ 7 km/px
+  aer       S5P UV aerosol index,        5x5 @ 7 km/px    (35 km)
+  co        S5P CO column,               5x5 @ 7 km/px    (35 km)
+  aer_wide  S5P UV aerosol index,        31x31 @ 7 km/px  (217 km, regional background)
+  dem       Copernicus GLO-30 elevation, 60x60 @ 200 m/px (12 km, static)
 
 Stations come from stations_to_download.csv (station_code, lat, lon). Patches are
 keyed on station_code and written to satellite_eea/<stream>/<station_code>.npy.
@@ -36,7 +38,9 @@ BBOX = {"lat_min": 34.0, "lat_max": 72.0, "lon_min": -25.0, "lon_max": 45.0}
 
 S2_BANDS = ["B2", "B3", "B4", "B5", "B6", "B7", "B8", "B8A", "B11", "B12"]
 
-# stream -> config. S2 streams carry bands; S5P streams carry a collection+band.
+# stream -> config. kind: s2 (bands, cloud-filtered median), s5p (collection+band,
+# annual mean), dem (static GLO-30 mosaic). Streams where values <= 0 are
+# legitimate (aer index, elevation) set nodata_finite_only.
 STREAMS = {
     "high_res": {"kind": "s2", "bands": S2_BANDS, "footprint_m": 1200, "px": 120,
                  "folder": "high_res_multispec", "max_nodata": 0.10},
@@ -46,11 +50,18 @@ STREAMS = {
             "band": "tropospheric_NO2_column_number_density",
             "folder": "no2_tropomi", "footprint_m": 35000, "px": 5, "max_nodata": 0.30},
     "aer": {"kind": "s5p", "coll": "COPERNICUS/S5P/OFFL/L3_AER_AI",
-            "band": "absorbing_aerosol_index",
+            "band": "absorbing_aerosol_index", "nodata_finite_only": True,
             "folder": "aer_tropomi", "footprint_m": 35000, "px": 5, "max_nodata": 0.30},
     "co":  {"kind": "s5p", "coll": "COPERNICUS/S5P/OFFL/L3_CO",
             "band": "CO_column_number_density",
             "folder": "co_tropomi", "footprint_m": 35000, "px": 5, "max_nodata": 0.30},
+    "aer_wide": {"kind": "s5p", "coll": "COPERNICUS/S5P/OFFL/L3_AER_AI",
+                 "band": "absorbing_aerosol_index", "nodata_finite_only": True,
+                 "folder": "aer_wide_tropomi", "footprint_m": 217000, "px": 31,
+                 "max_nodata": 0.30},
+    "dem": {"kind": "dem", "coll": "COPERNICUS/DEM/GLO30", "band": "DEM",
+            "nodata_finite_only": True,
+            "folder": "dem_glo30", "footprint_m": 12000, "px": 60, "max_nodata": 0.10},
 }
 
 MAX_RETRIES, RETRY_DELAY = 3, 5
@@ -103,6 +114,10 @@ def build_composite(ee, cfg):
                 .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", MAX_CLOUD_PCT))
                 .select(cfg["bands"]))
         return coll.median()
+    if cfg["kind"] == "dem":
+        # static tiled dataset: mosaic, no date filter
+        return (ee.ImageCollection(cfg["coll"]).filterBounds(region)
+                .select(cfg["band"]).mosaic())
     coll = (ee.ImageCollection(cfg["coll"]).filterDate(DATE_FROM, DATE_TO)
             .filterBounds(region).select(cfg["band"]))
     return coll.mean()
@@ -138,8 +153,8 @@ def fetch_patch(ee, image, cfg, lat, lon):
     return None
 
 
-def nodata_fraction(arr, stream):
-    if stream == "aer":                      # AER index can be legitimately negative
+def nodata_fraction(arr, cfg):
+    if cfg.get("nodata_finite_only"):     # values <= 0 legitimate (aer index, elevation)
         return float(np.mean(~np.isfinite(arr)))
     return float(np.mean(~np.isfinite(arr) | (arr <= 0)))
 
@@ -169,7 +184,7 @@ def run_stream(ee, stream, stations, force):
             failed += 1
             print(f"  [{i+1}/{n}] {code}: FAILED")
             continue
-        frac = nodata_fraction(arr, stream)
+        frac = nodata_fraction(arr, cfg)
         if frac > cfg["max_nodata"]:
             rows.append({"station_code": code, "stream": stream, "status": "corrupted",
                          "nodata_frac": frac})
@@ -193,7 +208,7 @@ def run_stream(ee, stream, stations, force):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--stream", nargs="+", required=True, choices=list(STREAMS),
-                    help="which streams to fetch, e.g. --stream high_res low_res no2")
+                    help="which streams to fetch, e.g. --stream aer_wide dem")
     ap.add_argument("--country", nargs="+", default=None,
                     help="only stations in these countries, e.g. --country AD")
     ap.add_argument("--force", action="store_true", help="re-fetch existing patches")

@@ -13,7 +13,7 @@ Run commands from the repository root.
 | `sensors-related/01_find_stats.py` | Prints the BigEarthNet band order and normalization constants. | terminal output |
 | `sensors-related/02_sat_normalize.py` | Loads patches, applies normalization, and can save debug preview images. | `debug_patches/` or a chosen preview image |
 | `sensors-related/03_train_resnet.py` | Trains the current PM10 ResNet baseline with state-based validation folds. | `resnet_cv_results.json` by default |
-| `01_eea_s2p_normalizer.py` | normalizes existing EEA S2 patches and pairs them with per-station annual PM labels for model training. | none (in-memory `Dataset`; optional `debug_eea_patches.png` if run standalone) |
+| `01_eea_s2p_normalizer.py` | normalizes existing EEA S2 patches and pairs them with per-station annual PM labels for model training. | no output file (must import EEAPatchDataset, load_labels) |
 
 ## Usual Commands
 

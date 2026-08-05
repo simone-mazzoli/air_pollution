@@ -10,6 +10,8 @@ ground measurements + satellite patches -> model -> pollution estimates in new p
 The repository is still a research project, so some stages are finished, some
 are experimental, and some are plans.
 
+We are parallely testing the signal and validity of the sensors, while also creating a branch off using all EEA stations to estimate a held-out region.
+
 ## 1. Input Data
 
 | Input | Folder/script | Output | Status |
