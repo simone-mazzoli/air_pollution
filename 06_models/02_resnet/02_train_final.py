@@ -5,8 +5,8 @@ save a checkpoint bundle for test-set inference. No held-out fold, no early
 stopping, fixed epoch budget. Reuses the architecture,
 dataset, stats, and seeding from the CV training script.
 
-Buffer leakage control (same as the CV script): training stations within
-CONFIG buffer_km of any NE-Germany test station are dropped before training,
+Buffer leakage control as in cv script: training stations within
+CONFIG buffer_km (100 km) of any NE-Germany test station are dropped before training,
 so the wide-patch footprints do not overlap the sealed test region.
 """
 import importlib.util
@@ -14,7 +14,7 @@ from pathlib import Path
 import numpy as np, pandas as pd, torch, torch.nn as nn
 from torch.utils.data import DataLoader
 
-EPOCHS = 25   # fixed budget (set near the CV folds' median peak epoch)
+EPOCHS = 25   # fixed 
 OUT = "final_model.pt"
 
 TRAIN_MODULE = Path(__file__).resolve().parent / "01_train_eea.py"
