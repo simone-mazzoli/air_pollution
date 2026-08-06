@@ -4,6 +4,7 @@ task/
 venv/
 client_id_GEE.txt
 .vscode/
+.vscode
 __pycache__/
 *.py[cod]
 .DS_Store
