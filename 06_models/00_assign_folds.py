@@ -8,13 +8,13 @@ column instead of recomputing routing logic.
 
 Folds:
 Spain, Portugal, Andorra
-France, Ireland
+France, Benelux
 Italy, Malta
 South/West Germany, Austria, Switzerland
-Benelux, Finalnd, Sweden, Norway, Denmark, Iceland
-Balkans
-Turkey, Greece, Bulgaria, Cyprus
-Poland, Lithuania, Latvia, Estonia
+Denmark, Sweden, Norway, Finland, Iceland, Ireland, Lithuania, Latvia, Estonia
+Balkans (east)
+Balkans (south), Turkey, Cyprus
+Poland, Czechia, Slovakia
 
 Outputs:
   data/processed/eea/station_fold.csv   (station_code, country, land, fold, lat, lon)
@@ -41,18 +41,17 @@ OUT_PLOT = PROC / "eea" / "fold_map.png"
 
 FOLDS = {
     "fold1_iberia": ["PT", "ES", "AD"],
-    "fold2_france": ["FR", "IE"],
+    "fold2_france": ["FR", "NL", "BE", "LU"],  
     "fold3_italy": ["IT", "MT"],
     "fold4_alpine": ["DE", "CH", "AT"],   # DE = western/southern Laender only
-    "fold5_north": ["NL", "BE", "LU", "DK", "SE", "NO", "FI", "IS"],
-    "fold6_balkan_e": ["CZ", "SK", "HU", "SI", "HR", "BA", "RS", "XK", "ME", "RO"],
-    "fold7_balkan_s": ["BG", "AL", "GR", "CY", "TR", "MK"],
-    "fold8_poland_baltics": ["PL", "LT", "LV", "EE"],   # ordinary CV fold now
+    "fold5_north": ["DK", "SE", "NO", "FI", "IS", "IE", "LT", "LV", "EE"],
+    "fold6_balkan_e": ["HU", "SI", "HR", "BA", "RS", "XK", "ME", "RO", "BG"], 
+    "fold7_balkan_s": ["AL", "GR", "CY", "TR", "MK"],   
+    "fold8_poland": ["PL", "CZ", "SK"],  
 }
 # SEALED TEST SET = eastern + northern German Laender ONLY: never trained on,
 # never a CV fold -> labelled "TEST" here. Western/southern German Laender stay
-# in fold4_alpine. There are no whole-country test members anymore (PL/LT/LV/EE
-# became fold8_poland_baltics).
+# in fold4_alpine. There are no whole-country test members anymore.
 COUNTRY_TO_FOLD = {cc: f for f, ccs in FOLDS.items() for cc in ccs}
 
 DE_TEST_LAENDER = {
@@ -86,8 +85,7 @@ def load_de_land():
 
 def assign_fold(code, de_land):
     """CV fold, or 'TEST' for the sealed set (east/north German Laender ONLY), or
-    None if unlisted. Other DE (west/south) -> fold4_alpine. PL/LT/LV/EE now map
-    to fold8_poland_baltics via the country table like any other CV country."""
+    None if unlisted. Other DE (west/south) -> fold4_alpine."""
     cc = code[:2]
     if cc == "DE":
         land = de_land.get(code)

@@ -6,25 +6,17 @@ Components:
   S5P no2/co 5x5 patches     -> small CNN -> 32
   S5P aerosol 31x31 (~217km) -> small strided CNN -> 64   (regional background)
   DEM relief 60x60 (~12km)   -> small CNN -> 64           (center-relative elevation)
-
 Scalar skips into the head: per-stream 5x5 patch means, local AER (wide-patch
 center, z-scored), station elevation in km (from DEM center).
-
 Predicts both pm10 and pm2.5 jointly (2-output head, masked loss so a station
 contributes to whichever labels it has). Cross Validation with Leave-one-out. 
 East/north German States are the final test set.
-
 Training samples get a random rotation/flip (applied identically to all spatial streams, same
 geography). eval uses the 8-view TTA average.
 --no-aer-wide / --no-dem drop the respective stream (ablation).
-
-Training architecture: head-only (backbone frozen, BN stats frozen throughout) for the
-first 20 epochs then backbone.layer4 unfreezes and joins the
-optimizer as a second param group. Both LRs are fixed for the whole run (no
-scheduler) - lr_head applies from epoch 1, lr_backbone only kicks in once
-layer4 is unfrozen. If --freeze-backbone is set, layer4 never unfreezes at all.
-
-
+Training architecture: head-only. The pretrained BigEarthNet backbone is frozen for
+the whole run (weights and BN stats never updated); only the projection, the small
+CNNs, and the head train. Single fixed lr_head, no scheduler.
 """
 import argparse, json, random
 from pathlib import Path
@@ -32,19 +24,20 @@ import numpy as np, pandas as pd
 import torch, torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 CONFIG = {
-    "epochs": 100, "batch": 128, "patience": 10,
-    "lr_head": 1e-5, "lr_backbone": 1e-6, "wd_head": 1e-4, "wd_backbone": 5e-4,
-    "proj_dim": 128, "dropout": 0.4, "low_cnn_ch1": 64, "low_cnn_ch2": 128,
-    "s5p_cnn_hidden": 64, "head_hidden": 256, "wide_feat": 64, "dem_feat": 64,
+    "epochs": 500, "batch": 128, "patience": 15,
+    "lr_head": 1e-5, "wd_head": 1e-7,
+    "proj_dim": 64, "dropout": 0.8, "low_cnn_ch1": 32, "low_cnn_ch2": 128,
+    "s5p_cnn_hidden": 32, "head_hidden": 64, "wide_feat": 32, "dem_feat": 32,
     "s5p_streams": ["no2", "co"],  # aerosol now enters via the wide stream
     "use_aer_wide": True, "use_dem": True,
-    "pretrained": True, "freeze_backbone": True, "unfreeze_epoch": 20,
+    "pretrained": True,
     "tta": True, "folds": None, "out": "eea_cv_results.json",
+    "buffer_km": 100.0,   # drop train stations within this many km of any val station (0=off)
     # annual means above these are treated as a broken sensor; label dropped
     "max_pm10": 120.0, "max_pm25": 80.0,
-    "pollutants": ["pm10", "pm25"],   # set to ["pm10"] or ["pm25"] for single-target
+    "pollutants": ["pm25"],   # set to ["pm10"] or ["pm25"] for single-target
 }
-SEED = 0
+SEED = 123
 CUDNN_DETERMINISTIC = False   # True -> exact repro on GPU, slower conv kernels
 RELIEF_SCALE = 250.0  # metres; fixed DEM relief normalizer (no fold stats needed)
 BASE = Path(__file__).resolve().parent.parent.parent
@@ -65,8 +58,6 @@ MEAN = np.array([438.3721, 614.0557, 588.4096, 942.8433, 1769.9316,
 STD = np.array([607.0269, 603.2968, 684.5688, 738.4327, 1100.4561,
                 1275.8054, 1369.3717, 1356.5441, 1070.1613, 813.5276],
                dtype="float32").reshape(1, 1, -1)
-
-
 def seed_everything(seed=SEED):
     random.seed(seed)
     np.random.seed(seed)
@@ -75,13 +66,9 @@ def seed_everything(seed=SEED):
     if CUDNN_DETERMINISTIC:
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
-
-
 def _worker_init(worker_id):
     np.random.seed(SEED + worker_id)
     random.seed(SEED + worker_id)
-
-
 def load_s2(path):
     arr = np.load(path)
     nodata = ~np.isfinite(arr) | (arr <= 0)
@@ -114,37 +101,51 @@ FOLDS = {
     "fold5_north": ["NL", "BE", "LU", "DK", "SE", "NO", "FI", "IS"],
     "fold6_balkan_e": ["CZ", "SK", "HU", "SI", "HR", "BA", "RS", "XK", "ME", "RO"],
     "fold7_balkan_s": ["BG", "AL", "GR", "CY", "TR", "MK"],
-    "fold8_poland_baltics": ["PL", "LT", "LV", "EE"],   # now a normal CV fold
+    "fold8_poland": ["PL", "LT", "LV", "EE"],   # now a normal CV fold
 }
 # Sealed test set is east/north German Laender ONLY -- labelled "TEST" in
 # station_fold.csv by 00_assign_folds.py, dropped from CV here. There are no
 # whole-country test members anymore.
 COUNTRY_TO_FOLD = {cc: f for f, ccs in FOLDS.items() for cc in ccs}
-
 # Fold membership is NOT computed here -- it is read from station_fold.csv, which
 # 00_assign_folds.py writes (and plots a QC map for). That keeps the split in one
 # place so the CV trainer, final trainer, and test inference can't disagree. Run
 # 00_assign_folds.py first. "TEST" rows (east/north DE) and unassigned rows are
 # dropped here exactly as before.
 STATION_FOLD = PROC / "eea" / "station_fold.csv"
-
-
 def _load_fold_map():
     if not STATION_FOLD.exists():
         raise SystemExit(
             f"ERROR: {STATION_FOLD} not found. Run 00_assign_folds.py first to "
             f"generate the fold assignment (and its QC map).")
-    sf = pd.read_csv(STATION_FOLD, dtype={"station_code": str})
-    return dict(zip(sf["station_code"], sf["fold"]))
-
-
+    return pd.read_csv(STATION_FOLD, dtype={"station_code": str})
+def buffer_exclude(train_df, val_df, buffer_km):
+    """Drop training stations whose location is within buffer_km of ANY validation
+    station (great-circle). Removes cross-border spatial leakage from overlapping
+    wide-patch footprints. Requires lat/lon columns."""
+    if len(train_df) == 0 or len(val_df) == 0:
+        return train_df
+    R = 6371.0
+    tlat = np.radians(train_df["lat"].values)[:, None]
+    tlon = np.radians(train_df["lon"].values)[:, None]
+    vlat = np.radians(val_df["lat"].values)[None, :]
+    vlon = np.radians(val_df["lon"].values)[None, :]
+    dphi = vlat - tlat
+    dl = vlon - tlon
+    a = np.sin(dphi / 2) ** 2 + np.cos(tlat) * np.cos(vlat) * np.sin(dl / 2) ** 2
+    dist = 2 * R * np.arcsin(np.sqrt(a))          # (n_train, n_val) km
+    nearest = dist.min(axis=1)
+    return train_df[nearest >= buffer_km]
 def load_frame(s5p_streams, cfg):
     lab = pd.read_csv(LABELS, dtype={"station_code": str})
     g = lab.groupby("station_code")
     ann = pd.DataFrame({"pm10": g["PM10"].mean(), "pm25": g["PM2.5"].mean()}).reset_index()
     ann["country"] = ann["station_code"].str[:2]
-    fold_map = _load_fold_map()
+    sf = _load_fold_map()
+    fold_map = dict(zip(sf["station_code"], sf["fold"]))
     ann["fold"] = ann["station_code"].map(fold_map)
+    coord = sf.set_index("station_code")[["lat", "lon"]]
+    ann = ann.join(coord, on="station_code")
     # "TEST" (east/north DE only) and NaN (unlisted / not in the fold file) are
     # both non-CV -> dropped. Genuinely-unlisted = no fold AND not TEST.
     dropped = ann[ann["fold"].isna()]["country"].value_counts()
@@ -205,7 +206,6 @@ class EEA(Dataset):
             extras.append(elev / 1000.0)                       # station elevation, km
         else:
             xd = torch.zeros(1, 1, 1)
-
         if self.augment:
             k = random.randint(0, 3)
             xh, xl, xs_patch, xw, xd = (torch.rot90(t, k, dims=(1, 2))
@@ -213,7 +213,6 @@ class EEA(Dataset):
             if random.random() < 0.5:
                 xh, xl, xs_patch, xw, xd = (torch.flip(t, dims=(2,))
                                             for t in (xh, xl, xs_patch, xw, xd))
-
         xs_mean = torch.tensor([float(c.mean()) for c in xs_patch] + extras,
                                dtype=torch.float32)
         y = np.zeros(len(POLLUTANTS), dtype="float32")
@@ -372,30 +371,17 @@ def train_one_fold(train_df, val_df, streams, cfg):
         vv = val_df[p].values; vv = vv[~np.isnan(vv)]
         base[p] = float(np.sqrt(np.mean((vv - tr_mean) ** 2))) if len(vv) else float("nan")
     print("  baseline (train mean): " + "  ".join(f"{DISPLAY[p]} RMSE={base[p]:.2f}" for p in POLLUTANTS))
-
     model = Net(len(streams), cfg, n_out=len(POLLUTANTS), pretrained=cfg["pretrained"]).to(DEVICE)
     for p in model.backbone.parameters():
         p.requires_grad = False
     hd = [p for n, p in model.named_parameters() if not n.startswith("backbone.")]
     opt = torch.optim.AdamW([{"params": hd, "lr": cfg["lr_head"], "weight_decay": cfg["wd_head"]}])
-    backbone_unfrozen = False
-    if cfg["freeze_backbone"]:
-        print("  backbone FROZEN for the whole run (head-only)")
-
     lossf = nn.SmoothL1Loss(reduction="none")
     def mean_val_rmse(res):
         vs = [res[p]["rmse"] for p in POLLUTANTS if not np.isnan(res[p]["rmse"])]
         return float(np.mean(vs)) if vs else np.inf
     best, best_state, bad = np.inf, None, 0
     for ep in range(1, cfg["epochs"] + 1):
-        if (not cfg["freeze_backbone"]) and (not backbone_unfrozen) and ep > cfg["unfreeze_epoch"]:
-            for p in model.backbone.layer4.parameters():
-                p.requires_grad = True
-            bb = [p for p in model.backbone.parameters() if p.requires_grad]
-            opt.add_param_group({"params": bb, "lr": cfg["lr_backbone"], "weight_decay": cfg["wd_backbone"]})
-            backbone_unfrozen = True
-            print(f"  epoch {ep}: unfreezing backbone.layer4 (lr={cfg['lr_backbone']:g}, fixed)")
-
         model.train(); model.backbone.eval()
         tot = 0.0
         for xh, xl, xs_patch, xw, xd, xs_mean, y, m in tr:
@@ -427,12 +413,11 @@ def train_one_fold(train_df, val_df, streams, cfg):
     return out, arrs
 def build_cfg_from_args(args):
     cfg = dict(CONFIG)
-    for k in ("epochs", "batch", "lr_head", "lr_backbone", "wd_head",
-              "patience", "tta", "out", "max_pm10", "max_pm25", "unfreeze_epoch"):
+    for k in ("epochs", "batch", "lr_head", "wd_head",
+              "patience", "tta", "out", "max_pm10", "max_pm25", "buffer_km"):
         cfg[k] = getattr(args, k)
     cfg["s5p_streams"] = args.s5p
     cfg["pretrained"] = not args.scratch
-    cfg["freeze_backbone"] = args.freeze_backbone
     cfg["use_aer_wide"] = args.use_aer_wide
     cfg["use_dem"] = args.use_dem
     cfg["folds"] = args.folds
@@ -443,7 +428,6 @@ def main():
     ap.add_argument("--epochs", type=int, default=CONFIG["epochs"])
     ap.add_argument("--batch", type=int, default=CONFIG["batch"])
     ap.add_argument("--lr-head", type=float, default=CONFIG["lr_head"])
-    ap.add_argument("--lr-backbone", type=float, default=CONFIG["lr_backbone"])
     ap.add_argument("--wd-head", type=float, default=CONFIG["wd_head"])
     ap.add_argument("--patience", type=int, default=CONFIG["patience"])
     ap.add_argument("--max-pm10", type=float, default=CONFIG["max_pm10"],
@@ -456,11 +440,9 @@ def main():
                     default=CONFIG["use_aer_wide"], help="drop the 31x31 aerosol stream")
     ap.add_argument("--no-dem", dest="use_dem", action="store_false",
                     default=CONFIG["use_dem"], help="drop the DEM relief stream")
+    ap.add_argument("--buffer-km", type=float, default=CONFIG["buffer_km"],
+                    help="exclude train stations within this many km of any val station (0=off)")
     ap.add_argument("--scratch", action="store_true")
-    ap.add_argument("--freeze-backbone", action="store_true", default=CONFIG["freeze_backbone"])
-    ap.add_argument("--unfreeze", dest="freeze_backbone", action="store_false")
-    ap.add_argument("--unfreeze-epoch", type=int, default=CONFIG["unfreeze_epoch"],
-                    help="epoch after which backbone.layer4 unfreezes (ignored if --freeze-backbone)")
     ap.add_argument("--tta", action="store_true", default=CONFIG["tta"])
     ap.add_argument("--folds", nargs="+", default=CONFIG["folds"])
     ap.add_argument("--out", default=CONFIG["out"])
@@ -479,6 +461,11 @@ def main():
         if len(val_df) < 10:
             print(f"########## {fold}: only {len(val_df)} stations, SKIPPING ##########\n")
             continue
+        if cfg["buffer_km"] > 0:
+            n_before = len(train_df)
+            train_df = buffer_exclude(train_df, val_df, cfg["buffer_km"]).reset_index(drop=True)
+            print(f"  buffer {cfg['buffer_km']:g}km: dropped {n_before - len(train_df)}"
+                  f"/{n_before} train stations near val border")
         print(f"########## VAL FOLD: {fold}  (train {len(train_df)}, val {len(val_df)}) ##########")
         res, arrs = train_one_fold(train_df, val_df, streams, cfg)
         print(f"  FINAL [{fold}]:")

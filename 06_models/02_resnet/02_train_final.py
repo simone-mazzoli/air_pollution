@@ -5,11 +5,17 @@ save a checkpoint bundle for test-set inference. No held-out fold, no early
 stopping, fixed epoch budget. Reuses the architecture,
 dataset, stats, and seeding from the CV training script.
 
+Buffer leakage control (same as the CV script): training stations within
+CONFIG buffer_km of any NE-Germany test station are dropped before training,
+so the wide-patch footprints do not overlap the sealed test region.
 """
-import argparse, importlib.util
+import importlib.util
 from pathlib import Path
-import numpy as np, torch, torch.nn as nn
+import numpy as np, pandas as pd, torch, torch.nn as nn
 from torch.utils.data import DataLoader
+
+EPOCHS = 25   # fixed budget (set near the CV folds' median peak epoch)
+OUT = "final_model.pt"
 
 TRAIN_MODULE = Path(__file__).resolve().parent / "01_train_eea.py"
 spec = importlib.util.spec_from_file_location("train_eea", TRAIN_MODULE)
@@ -17,39 +23,52 @@ T = importlib.util.module_from_spec(spec); spec.loader.exec_module(T)
 DEVICE = T.DEVICE
 
 
+def load_test_frame(streams, cfg):
+    """NE-Germany test stations (fold == TEST in station_fold.csv), with lat/lon,
+    same outlier + patch-completeness filtering as the CV frame. Used only as the
+    reference set for the buffer exclusion."""
+    sf = T._load_fold_map()
+    test_codes = set(sf.loc[sf["fold"] == "TEST", "station_code"])
+    lab = pd.read_csv(T.LABELS, dtype={"station_code": str})
+    g = lab.groupby("station_code")
+    ann = pd.DataFrame({"pm10": g["PM10"].mean(), "pm25": g["PM2.5"].mean()}).reset_index()
+    ann = ann[ann["station_code"].isin(test_codes)].reset_index(drop=True)
+    coord = sf.set_index("station_code")[["lat", "lon"]]
+    ann = ann.join(coord, on="station_code")
+    for p, cap in (("pm10", cfg["max_pm10"]), ("pm25", cfg["max_pm25"])):
+        ann.loc[(ann[p] <= 0) | (ann[p] > cap), p] = np.nan
+    ann = ann[ann[["pm10", "pm25"]].notna().any(axis=1)].reset_index(drop=True)
+    extra = ([T.AERW] if cfg["use_aer_wide"] else []) + ([T.DEMD] if cfg["use_dem"] else [])
+    def has_all(code):
+        if not ((T.HIGH / f"{code}.npy").exists() and (T.LOW / f"{code}.npy").exists()):
+            return False
+        if not all((T.SAT / st / f"{code}.npy").exists() for st in streams):
+            return False
+        return all((d / f"{code}.npy").exists() for d in extra)
+    ann = ann[ann["station_code"].map(has_all)].reset_index(drop=True)
+    return ann
+
+
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--epochs", type=int, default=20, #N EPOCHS
-                    help="fixed budget (CV folds early-stop at various epochs; "
-                         "after the new CV run, set this near their median)")
-    ap.add_argument("--batch", type=int, default=T.CONFIG["batch"])
-    ap.add_argument("--s5p", nargs="+", default=T.CONFIG["s5p_streams"])
-    ap.add_argument("--no-aer-wide", dest="use_aer_wide", action="store_false",
-                    default=T.CONFIG["use_aer_wide"])
-    ap.add_argument("--no-dem", dest="use_dem", action="store_false",
-                    default=T.CONFIG["use_dem"])
-    ap.add_argument("--scratch", action="store_true")
-    ap.add_argument("--unfreeze-epoch", type=int, default=T.CONFIG["unfreeze_epoch"])
-    ap.add_argument("--out", default="final_model.pt")
-    args = ap.parse_args()
-    T.seed_everything()                      # SEED=0 in 01_train_eea.py
-
+    T.seed_everything()                      # SEED in 01_train_eea.py
     cfg = dict(T.CONFIG)
-    cfg["epochs"] = args.epochs; cfg["batch"] = args.batch
-    cfg["s5p_streams"] = args.s5p; cfg["pretrained"] = not args.scratch
-    cfg["use_aer_wide"] = args.use_aer_wide; cfg["use_dem"] = args.use_dem
-    cfg["unfreeze_epoch"] = args.unfreeze_epoch; cfg["freeze_backbone"] = False
+    cfg["epochs"] = EPOCHS
     cfg["pollutants"] = list(T.POLLUTANTS)
-
     streams = [f"{s}_tropomi" for s in cfg["s5p_streams"]]
-    df = T.load_frame(streams, cfg)          # all CV stations, test countries already excluded
+
+    df = T.load_frame(streams, cfg)          # all CV stations (TEST excluded)
+    test_df = load_test_frame(streams, cfg)  # NE-Germany, reference for the buffer
+    if cfg["buffer_km"] > 0:
+        n_before = len(df)
+        df = T.buffer_exclude(df, test_df, cfg["buffer_km"]).reset_index(drop=True)
+        print(f"buffer {cfg['buffer_km']:g}km: dropped {n_before - len(df)}/{n_before} "
+              f"train stations near NE-Germany")
     print(f"\ndevice: {DEVICE}  |  seed: {T.SEED}  |  final model on ALL {len(df)} "
-          f"CV stations, {args.epochs} epochs (no held-out fold)\n")
+          f"CV stations, {cfg['epochs']} epochs (no held-out fold)\n")
 
     tmean = np.array([np.nanmean(np.log(df[p].values)) for p in T.POLLUTANTS], "float64")
     tstd = np.array([np.nanstd(np.log(df[p].values)) or 1.0 for p in T.POLLUTANTS], "float64")
     s5p_stats = T.compute_s5p_stats(df, streams, cfg)
-
     tr = DataLoader(T.EEA(df, streams, tmean, tstd, s5p_stats, cfg, augment=True),
                     batch_size=cfg["batch"], shuffle=True, num_workers=4,
                     pin_memory=True, drop_last=True, worker_init_fn=T._worker_init)
@@ -60,17 +79,8 @@ def main():
     hd = [p for n, p in model.named_parameters() if not n.startswith("backbone.")]
     opt = torch.optim.AdamW([{"params": hd, "lr": cfg["lr_head"], "weight_decay": cfg["wd_head"]}])
     lossf = nn.SmoothL1Loss(reduction="none")
-    unfrozen = False
 
     for ep in range(1, cfg["epochs"] + 1):
-        if (not unfrozen) and ep > cfg["unfreeze_epoch"]:
-            for p in model.backbone.layer4.parameters():
-                p.requires_grad = True
-            bb = [p for p in model.backbone.parameters() if p.requires_grad]
-            opt.add_param_group({"params": bb, "lr": cfg["lr_backbone"],
-                                 "weight_decay": cfg["wd_backbone"]})
-            unfrozen = True
-            print(f"  epoch {ep}: unfreezing backbone.layer4")
         model.train(); model.backbone.eval()
         tot = 0.0
         for xh, xl, xs_patch, xw, xd, xs_mean, y, m in tr:
@@ -87,8 +97,8 @@ def main():
         "cfg": cfg, "streams": streams, "pollutants": list(T.POLLUTANTS),
         "tmean": tmean, "tstd": tstd, "s5p_stats": s5p_stats,
     }
-    torch.save(bundle, args.out)
-    print(f"\nsaved {args.out}")
+    torch.save(bundle, OUT)
+    print(f"\nsaved {OUT}")
 
 
 if __name__ == "__main__":
