@@ -22,7 +22,7 @@ the exact run configuration is known. Do not automatically relabel it as
 `eea_cv_results.json` is written by:
 
 ```bash
-python 06_models/01_train_cv.py --experiment resnet_frozen
+python3 06_models/01_train_cv.py --experiment all
 ```
 
 It contains per-fold validation metrics, baseline metrics, station counts,
@@ -51,7 +51,7 @@ Python/PyTorch/CUDA/device information, and run timestamps.
 `final_model.pt` is written by:
 
 ```bash
-python 06_models/02_train_final.py --experiment resnet_frozen
+python3 06_models/02_train_final.py --experiment <selected_experiment>
 ```
 
 It contains the model weights plus the information needed to reproduce test
@@ -73,7 +73,7 @@ prediction with the same preprocessing:
 `test_predictions.csv` is written by:
 
 ```bash
-python 06_models/03_predict_test.py --experiment resnet_frozen
+python3 06_models/03_predict_test.py --experiment <selected_experiment>
 ```
 
 It contains sealed TEST predictions with station metadata and true labels where
@@ -88,10 +88,11 @@ unless they are intentionally needed for hand-in or reproducibility.
 After one or more CV runs are complete, run:
 
 ```bash
-python 06_models/04_summarize_results.py
+python3 06_models/summarize_cv_results.py
 ```
 
-The script reads the available experiment folders and writes:
+The script reads available CV experiment folders only. It does not inspect final
+checkpoints or sealed TEST predictions. It writes:
 
 ```text
 summary/experiment_comparison.csv

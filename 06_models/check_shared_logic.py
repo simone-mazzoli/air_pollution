@@ -7,7 +7,7 @@ from torch.utils.data import TensorDataset
 
 from shared import data, evaluation, experiment, folds, paths, runtime, summary, training
 from shared.config import CPU_INTEROP_THREADS, CPU_THREADS, NUM_WORKERS, result_paths
-from shared.models import SUPPORTED_EXPERIMENTS, selected_model
+from shared.models import SUPPORTED_EXPERIMENTS, cv_run_plan, require_single_experiment, selected_model
 from cnn.config import CNN_CONFIG
 from cnn.model import ScratchHighEncoder, build_model as build_cnn_model
 from resnet.config import RESNET_CONFIG
@@ -84,6 +84,19 @@ def check_scratch_cnn():
 
 
 def check_experiment_artifacts():
+    assert SUPPORTED_EXPERIMENTS == ("cnn", "resnet_frozen", "resnet_layer4")
+    assert cv_run_plan("all", None) == [(name, None) for name in SUPPORTED_EXPERIMENTS]
+    assert cv_run_plan("all", ["fold1_iberia"]) == [
+        (name, ["fold1_iberia"]) for name in SUPPORTED_EXPERIMENTS
+    ]
+    for stage in ("Final training", "Sealed TEST evaluation"):
+        try:
+            require_single_experiment("all", stage)
+        except SystemExit as exc:
+            assert "requires one explicitly selected experiment" in str(exc)
+        else:
+            raise AssertionError(f"{stage} should reject --experiment all")
+
     result_dirs = [result_paths(name)["dir"] for name in SUPPORTED_EXPERIMENTS]
     assert len(set(result_dirs)) == len(SUPPORTED_EXPERIMENTS)
     for name in SUPPORTED_EXPERIMENTS:
@@ -164,6 +177,8 @@ def write_fake_result(name, pollutant="pm25"):
 
 
 def check_summary_script_logic():
+    assert Path(__file__).with_name("summarize_cv_results.py").exists()
+    assert not Path(__file__).with_name("04_summarize_results.py").exists()
     old_results = paths.RESULTS
     with TemporaryDirectory() as td:
         paths.RESULTS = Path(td)

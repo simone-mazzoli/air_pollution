@@ -1,6 +1,28 @@
 from .config import MODEL
 
-SUPPORTED_EXPERIMENTS = ("resnet_frozen", "resnet_layer4", "cnn")
+SUPPORTED_EXPERIMENTS = ("cnn", "resnet_frozen", "resnet_layer4")
+CV_EXPERIMENT_CHOICES = (*SUPPORTED_EXPERIMENTS, "all")
+
+
+def expand_cv_experiments(name):
+    if name == "all":
+        return list(SUPPORTED_EXPERIMENTS)
+    if name in SUPPORTED_EXPERIMENTS:
+        return [name]
+    raise SystemExit(f"ERROR: unknown experiment {name}")
+
+
+def cv_run_plan(name, selected_folds):
+    return [(experiment, selected_folds) for experiment in expand_cv_experiments(name)]
+
+
+def require_single_experiment(name, stage):
+    if name == "all":
+        choices = ", ".join(SUPPORTED_EXPERIMENTS)
+        raise SystemExit(f"ERROR: {stage} requires one explicitly selected experiment. Choose one of: {choices}.")
+    if name not in SUPPORTED_EXPERIMENTS:
+        raise SystemExit(f"ERROR: unknown experiment {name}")
+    return name
 
 
 def _resnet_config(mode):

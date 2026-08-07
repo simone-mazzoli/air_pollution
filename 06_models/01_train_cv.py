@@ -6,28 +6,25 @@ import pandas as pd
 
 from shared import data, evaluation, experiment, folds, runtime, training
 from shared.config import CV_EPOCHS, CV_FOLDS, DEVICE, DISPLAY, MODEL, SEED, result_paths, training_config
-from shared.models import SUPPORTED_EXPERIMENTS, selected_model
+from shared.models import CV_EXPERIMENT_CHOICES, cv_run_plan, selected_model
 
 
 def parse_args():
     ap = argparse.ArgumentParser(
-        description="Train cross-validation folds using the Python config defaults."
+        description="Cross-validate one experiment, or all CV candidate experiments sequentially."
     )
-    ap.add_argument("--experiment", default=MODEL, choices=SUPPORTED_EXPERIMENTS,
-                    help="experiment to run")
+    ap.add_argument("--experiment", default=MODEL, choices=CV_EXPERIMENT_CHOICES,
+                    help="CV experiment to run; use 'all' to run cnn, resnet_frozen, then resnet_layer4")
     ap.add_argument("--folds", nargs="+", default=CV_FOLDS,
                     help="optional subset of fold names to run")
     return ap.parse_args()
 
 
-def main():
-    runtime.apply_runtime_config()
-    print(runtime.runtime_summary())
-    args = parse_args()
+def run_experiment(experiment_name, selected_folds):
     data.seed_everything()
-    build_model, model_config = selected_model(args.experiment)
+    build_model, model_config = selected_model(experiment_name)
     result = result_paths(model_config["experiment"])
-    cfg = training_config(model_config, epochs=CV_EPOCHS, folds=args.folds)
+    cfg = training_config(model_config, epochs=CV_EPOCHS, folds=selected_folds)
     started_at = experiment.now_utc()
     experiment.reset_csv(result["cv_history"])
     experiment.reset_csv(result["cv_folds"])
@@ -121,6 +118,19 @@ def main():
         completed_at=experiment.now_utc(),
     ))
     print(f"saved {result['cv_results']}")
+
+
+def main():
+    runtime.apply_runtime_config()
+    print(runtime.runtime_summary())
+    args = parse_args()
+    plan = cv_run_plan(args.experiment, args.folds)
+    for i, (experiment_name, selected_folds) in enumerate(plan, start=1):
+        if len(plan) > 1:
+            print("\n" + "=" * 60)
+            print(f"EXPERIMENT {i}/{len(plan)}: {experiment_name}")
+            print("=" * 60)
+        run_experiment(experiment_name, selected_folds)
 
 
 if __name__ == "__main__":

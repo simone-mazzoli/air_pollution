@@ -42,7 +42,7 @@ predictions.
 |-- 01_train_cv.py
 |-- 02_train_final.py
 |-- 03_predict_test.py
-|-- 04_summarize_results.py
+|-- summarize_cv_results.py
 |-- check_shared_logic.py
 |-- shared/
 |-- resnet/
@@ -62,7 +62,7 @@ predictions.
   TEST stations.
 - `03_predict_test.py` loads the final checkpoint and evaluates the sealed
   northern/eastern Germany TEST stations.
-- `04_summarize_results.py` reads completed experiment result folders and
+- `summarize_cv_results.py` reads completed CV experiment result folders and
   writes comparison tables under `results/summary/`.
 - `check_shared_logic.py` is a small assertion-based check for modeling logic.
   It prints nothing when all checks pass.
@@ -81,13 +81,21 @@ Run commands from the repository root. On JupyterHub, first make sure the repo
 can see the `data/` folder in the expected location.
 
 ```bash
-python 06_models/00_assign_folds.py
-python check_model_data.py
-python 06_models/check_shared_logic.py
-python 06_models/01_train_cv.py --experiment resnet_frozen
-python 06_models/02_train_final.py --experiment resnet_frozen
-python 06_models/03_predict_test.py --experiment resnet_frozen
-python 06_models/04_summarize_results.py
+python3 06_models/00_assign_folds.py
+python3 check_model_data.py
+python3 06_models/check_shared_logic.py
+
+# 1. Run development CV for every candidate experiment
+python3 06_models/01_train_cv.py --experiment all
+
+# 2. Compare CV experiments
+python3 06_models/summarize_cv_results.py
+
+# 3. After selecting one experiment from CV
+python3 06_models/02_train_final.py --experiment <selected_experiment>
+
+# 4. Only after model selection is final
+python3 06_models/03_predict_test.py --experiment <selected_experiment>
 ```
 
 `00_assign_folds.py` should only be run when `station_fold.csv` genuinely needs
@@ -103,36 +111,46 @@ The steps are:
   needed by the models are present and usable.
 - `check_shared_logic.py`: checks that important modeling assumptions still
   behave as expected in code.
-- `01_train_cv.py`: trains and validates one selected experiment on development
-  folds only.
-- `02_train_final.py`: trains the final model for that same experiment using
-  the CV-selected epoch count.
-- `03_predict_test.py`: evaluates that experiment's final checkpoint on the
+- `01_train_cv.py`: trains and validates candidate experiments on development
+  folds only. `--experiment all` runs `cnn`, then `resnet_frozen`, then
+  `resnet_layer4` sequentially.
+- `summarize_cv_results.py`: compares whichever CV experiment result folders
+  have already been produced. It does not inspect sealed TEST results.
+- `02_train_final.py`: after one experiment has been chosen, trains a fresh
+  model for that experiment on all development folds using the CV-derived epoch
+  count. Fold models are not merged.
+- `03_predict_test.py`: evaluates that one selected final checkpoint on the
   sealed TEST stations.
-- `04_summarize_results.py`: compares whichever experiment result folders have
-  already been produced.
 
 The supported experiment names are:
 
 ```text
+cnn
 resnet_frozen
 resnet_layer4
-cnn
 ```
 
 Use `--experiment` to choose which one to run:
 
 ```bash
-python 06_models/01_train_cv.py --experiment cnn
+python3 06_models/01_train_cv.py --experiment cnn
+```
+
+To run all candidate CV experiments in the standard order:
+
+```bash
+python3 06_models/01_train_cv.py --experiment all
 ```
 
 To run only a few development folds while testing code:
 
 ```bash
-python 06_models/01_train_cv.py --experiment cnn --folds fold1_iberia fold2_france
+python3 06_models/01_train_cv.py --experiment all --folds fold1_iberia
 ```
 
-Subset runs are useful for debugging, but they are not a full CV result.
+Subset runs are useful for debugging, but they are not a full CV result. The
+`all` option is only for CV. Final training and sealed TEST prediction require
+one explicitly selected experiment.
 
 ## Required Data
 
@@ -431,11 +449,12 @@ produced it.
 After one or more CV runs have finished, create comparison tables with:
 
 ```bash
-python 06_models/04_summarize_results.py
+python3 06_models/summarize_cv_results.py
 ```
 
 The summarizer reads only existing result folders. It reports missing
-experiments instead of inventing numbers. It writes:
+experiments instead of inventing numbers. It reads completed CV outputs only and
+does not inspect final-model or sealed TEST outputs. It writes:
 
 ```text
 results/summary/experiment_comparison.csv
@@ -465,7 +484,7 @@ check_model_data.py
 Run the shared logic check with:
 
 ```bash
-python 06_models/check_shared_logic.py
+python3 06_models/check_shared_logic.py
 ```
 
 It is a lightweight assertion-based smoke test. No terminal output means all

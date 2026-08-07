@@ -7,12 +7,13 @@ import torch.nn as nn
 
 from shared import data, evaluation, folds, runtime, training
 from shared.config import CACHE_PATCHES, DEVICE, MODEL, SEED, result_paths, training_config
-from shared.models import SUPPORTED_EXPERIMENTS, selected_model
+from shared.models import SUPPORTED_EXPERIMENTS, require_single_experiment, selected_model
 
 
 def parse_args():
-    ap = argparse.ArgumentParser(description="Train the final model for one configured experiment.")
-    ap.add_argument("--experiment", default=MODEL, choices=SUPPORTED_EXPERIMENTS)
+    choices = "{" + ",".join(SUPPORTED_EXPERIMENTS) + "}"
+    ap = argparse.ArgumentParser(description="Train one selected experiment on all development folds.")
+    ap.add_argument("--experiment", default=MODEL, metavar=choices)
     return ap.parse_args()
 
 
@@ -20,8 +21,9 @@ def main():
     runtime.apply_runtime_config()
     print(runtime.runtime_summary())
     args = parse_args()
+    experiment_name = require_single_experiment(args.experiment, "Final training")
     data.seed_everything()
-    build_model, model_config = selected_model(args.experiment)
+    build_model, model_config = selected_model(experiment_name)
     result = result_paths(model_config["experiment"])
     final_epochs, cv_best_epochs, epoch_rule = training.final_epochs_from_cv(
         result["cv_results"], folds.development_fold_names())
