@@ -42,6 +42,7 @@ predictions.
 |-- 01_train_cv.py
 |-- 02_train_final.py
 |-- 03_predict_test.py
+|-- 04_summarize_results.py
 |-- check_shared_logic.py
 |-- shared/
 |-- resnet/
@@ -61,6 +62,8 @@ predictions.
   TEST stations.
 - `03_predict_test.py` loads the final checkpoint and evaluates the sealed
   northern/eastern Germany TEST stations.
+- `04_summarize_results.py` reads completed experiment result folders and
+  writes comparison tables under `results/summary/`.
 - `check_shared_logic.py` is a small assertion-based check for modeling logic.
   It prints nothing when all checks pass.
 - `shared/` contains data loading, folds, metrics, training helpers, paths, and
@@ -82,9 +85,10 @@ can see the `data/` folder in the expected location.
 python 06_models/00_assign_folds.py
 python check_model_data.py
 python 06_models/check_shared_logic.py
-python 06_models/01_train_cv.py
-python 06_models/02_train_final.py
-python 06_models/03_predict_test.py
+python 06_models/01_train_cv.py --experiment resnet_frozen
+python 06_models/02_train_final.py --experiment resnet_frozen
+python 06_models/03_predict_test.py --experiment resnet_frozen
+python 06_models/04_summarize_results.py
 ```
 
 `00_assign_folds.py` should only be run when `station_fold.csv` genuinely needs
@@ -100,15 +104,33 @@ The steps are:
   needed by the models are present and usable.
 - `check_shared_logic.py`: checks that important modeling assumptions still
   behave as expected in code.
-- `01_train_cv.py`: trains and validates on development folds only.
-- `02_train_final.py`: trains the final model using the CV-selected epoch count.
-- `03_predict_test.py`: evaluates the final checkpoint on the sealed TEST
-  stations.
+- `01_train_cv.py`: trains and validates one selected experiment on development
+  folds only.
+- `02_train_final.py`: trains the final model for that same experiment using
+  the CV-selected epoch count.
+- `03_predict_test.py`: evaluates that experiment's final checkpoint on the
+  sealed TEST stations.
+- `04_summarize_results.py`: compares whichever experiment result folders have
+  already been produced.
+
+The supported experiment names are:
+
+```text
+resnet_frozen
+resnet_layer4
+cnn
+```
+
+Use `--experiment` to choose which one to run:
+
+```bash
+python 06_models/01_train_cv.py --experiment cnn
+```
 
 To run only a few development folds while testing code:
 
 ```bash
-python 06_models/01_train_cv.py --folds fold1_iberia fold2_france
+python 06_models/01_train_cv.py --experiment cnn --folds fold1_iberia fold2_france
 ```
 
 Subset runs are useful for debugging, but they are not a full CV result.
@@ -253,10 +275,10 @@ using development-fold CV before any sealed TEST evaluation.
 
 ### `cnn`
 
-`cnn/` is reserved for the required CNN trained from scratch. It should use the
-same station assignments, 100 km buffer, preprocessing, target transformation,
-metrics, and sealed TEST setup as the ResNet experiments. Its architecture is
-intentionally not finalized yet.
+`cnn` uses a scratch high-resolution Sentinel-2 encoder instead of the
+BigEarthNet-pretrained ResNet50. It still uses the same station assignments,
+100 km buffer, preprocessing, target transformation, metrics, and sealed TEST
+setup as the ResNet experiments.
 
 ## Shared Multimodal Architecture
 
@@ -386,9 +408,17 @@ results/cnn/
 
 Each experiment folder can contain:
 
+- `cv_history.csv`: one row per completed CV epoch, with the experiment, fold,
+  epoch, training loss, train and validation metrics, optimizer learning rates,
+  timing diagnostics, best-so-far flag, and patience counter;
+- `cv_folds.csv`: one row per fold and pollutant, with station counts, buffer
+  removals, best epoch, validation metrics, baseline RMSE, and parameter counts;
 - `eea_cv_results.json`: per-fold CV metrics, baseline metrics, buffer counts,
   parameter counts, epoch metadata, and the configuration used for the run;
 - `eea_cv_predictions.csv`: validation predictions with station metadata;
+- `run_metadata.json`: experiment configuration, fold setup, 100 km buffer,
+  parameter counts, model metadata, Git state, Python/PyTorch/CUDA/device
+  information, and run timestamps;
 - `final_model.pt`: the final checkpoint plus normalization values, S5P
   training statistics, baseline concentration, buffer metadata, parameter
   counts, and CV-derived epoch information;
@@ -397,6 +427,20 @@ Each experiment folder can contain:
 This metadata matters because a result is only interpretable when we know which
 fold file, model variant, learning rates, TTA setting, and buffer setting
 produced it.
+
+After one or more CV runs have finished, create comparison tables with:
+
+```bash
+python 06_models/04_summarize_results.py
+```
+
+The summarizer reads only existing result folders. It reports missing
+experiments instead of inventing numbers. It writes:
+
+```text
+results/summary/experiment_comparison.csv
+results/summary/fold_comparison.csv
+```
 
 The older `results/resnet/` directory may contain earlier frozen-ResNet outputs.
 Leave those files as historical outputs unless their exact configuration is
@@ -437,6 +481,9 @@ It currently checks:
 - patch-cache reuse and cached-array mutation protection;
 - arithmetic train-mean baseline behavior;
 - prediction metadata;
+- experiment selection routes;
+- epoch-history, fold-summary, and run-metadata serialization;
+- summary-table behavior with complete and incomplete result folders;
 - separate result paths for each experiment;
 - the CV-derived final epoch rule;
 - frozen ResNet trainability;

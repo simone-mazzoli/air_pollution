@@ -5,10 +5,13 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from torch.utils.data import TensorDataset
 
-from shared import data, evaluation, folds, runtime, training
+from shared import data, evaluation, experiment, folds, paths, runtime, summary, training
 from shared.config import CPU_INTEROP_THREADS, CPU_THREADS, NUM_WORKERS, result_paths
+from shared.models import SUPPORTED_EXPERIMENTS, selected_model
+from cnn.config import CNN_CONFIG
+from cnn.model import ScratchHighEncoder, build_model as build_cnn_model
 from resnet.config import RESNET_CONFIG
-from resnet.model import build_model
+from resnet.model import build_model as build_resnet_model
 
 
 def resnet_cfg(mode):
@@ -38,6 +41,138 @@ def dummy_forward(model):
     xd = torch.zeros(2, 1, 60, 60)
     xs_mean = torch.zeros(2, 4)
     assert tuple(model(xh, xl, xs_patch, xw, xd, xs_mean).shape) == (2, 1)
+
+
+def cnn_cfg():
+    cfg = dict(CNN_CONFIG)
+    cfg.update({
+        "use_aer_wide": True,
+        "use_dem": True,
+        "s5p_streams": ["no2", "co"],
+        "pollutants": ["pm25"],
+    })
+    return cfg
+
+
+def check_scratch_cnn():
+    encoder = ScratchHighEncoder()
+    assert tuple(encoder(torch.zeros(2, 10, 120, 120)).shape) == (2, 256)
+    assert all(p.requires_grad for p in encoder.parameters())
+
+    cfg = cnn_cfg()
+    model = build_cnn_model(2, cfg, 1)
+    dummy_forward(model)
+    assert all(p.requires_grad for p in model.parameters())
+    counts = training.parameter_counts(model)
+    assert counts["total"] == counts["trainable"]
+    assert counts["frozen"] == 0
+    meta = training.model_metadata(model, cfg)
+    assert meta["model"] == "cnn"
+    assert meta["experiment"] == "cnn"
+    assert meta["high_encoder_feature_dim"] == 256
+    assert meta["trainable_high_encoder_parameters"] == sum(p.numel() for p in model.backbone.parameters())
+
+
+def check_experiment_artifacts():
+    result_dirs = [result_paths(name)["dir"] for name in SUPPORTED_EXPERIMENTS]
+    assert len(set(result_dirs)) == len(SUPPORTED_EXPERIMENTS)
+    for name in SUPPORTED_EXPERIMENTS:
+        _, cfg = selected_model(name)
+        assert cfg["experiment"] == name
+
+    with TemporaryDirectory() as td:
+        root = Path(td)
+        row = experiment.epoch_history_row(
+            {"experiment": "cnn", "pollutants": ["pm25"]},
+            "fold1_iberia",
+            1,
+            0.5,
+            {"pm25": {"rmse": 1.0, "mae": 0.8, "r2": 0.1, "n": 2}},
+            {"pm25": {"rmse": 1.2, "mae": 0.9, "r2": -0.1, "n": 2}},
+            torch.optim.AdamW([torch.nn.Parameter(torch.ones(1))], lr=1e-5),
+            {"train_seconds": 1.0, "train_eval_seconds": 0.2, "val_seconds": 0.3, "total_seconds": 1.5},
+            True,
+            0,
+        )
+        history_path = root / "cv_history.csv"
+        experiment.append_csv_row(history_path, row)
+        history = pd.read_csv(history_path)
+        assert history.loc[0, "experiment"] == "cnn"
+        assert history.loc[0, "val_pm25_rmse"] == 1.2
+
+        fold_result = {
+            "n_train": 10,
+            "n_val": 2,
+            "best_epoch": 1,
+            "buffer_removed_train_stations": 3,
+            "n_train_before_buffer": 13,
+            "parameter_counts": {"total": 7, "trainable": 7, "frozen": 0},
+            "pm25": {"rmse": 1.2, "mae": 0.9, "r2": -0.1, "n": 2, "baseline": 1.5},
+        }
+        fold_path = root / "cv_folds.csv"
+        for fold_row in experiment.fold_summary_rows({"experiment": "cnn", "pollutants": ["pm25"]},
+                                                     "fold1_iberia", fold_result):
+            experiment.append_csv_row(fold_path, fold_row)
+        folds_csv = pd.read_csv(fold_path)
+        assert folds_csv.loc[0, "n_buffer_dropped"] == 3
+
+        meta = experiment.run_metadata(
+            {"experiment": "cnn", "model": "cnn", "pollutants": ["pm25"], "buffer_km": 100.0},
+            parameter_counts={"total": 7, "trainable": 7, "frozen": 0},
+            model_metadata={"high_encoder": "scratch", "trainable_high_encoder_parameters": 4},
+            started_at="start",
+        )
+        assert meta["experiment"] == "cnn"
+        assert meta["parameter_counts"]["total"] == 7
+        assert meta["parameter_counts"]["trainable_high_encoder_parameters"] == 4
+        assert meta["model_metadata"]["high_encoder"] == "scratch"
+
+
+def write_fake_result(name, pollutant="pm25"):
+    result = result_paths(name)
+    result["dir"].mkdir(parents=True, exist_ok=True)
+    result["cv_results"].write_text(
+        '{"pooled_out_of_fold": {"pm25": {"rmse": 1.0, "mae": 0.8, "r2": 0.2, "n": 5}}}'
+    )
+    pd.DataFrame([{
+        "experiment": name,
+        "fold": "fold1_iberia",
+        "pollutant": pollutant,
+        "n_train": 10,
+        "n_val": 5,
+        "n_buffer_dropped": 1,
+        "best_epoch": 2,
+        "rmse": 1.1,
+        "mae": 0.9,
+        "r2": 0.1,
+        "n": 5,
+        "baseline_rmse": 1.4,
+        "total_parameters": 100,
+        "trainable_parameters": 80,
+        "frozen_parameters": 20,
+    }]).to_csv(result["cv_folds"], index=False)
+
+
+def check_summary_script_logic():
+    old_results = paths.RESULTS
+    with TemporaryDirectory() as td:
+        paths.RESULTS = Path(td)
+        try:
+            write_fake_result("cnn")
+            partial = summary.summarize_results()
+            assert partial["available"] == ["cnn"]
+            assert "resnet_frozen" in partial["missing"]
+            assert len(partial["comparison"]) == 1
+
+            write_fake_result("resnet_frozen")
+            write_fake_result("resnet_layer4")
+            complete = summary.summarize_results()
+            assert sorted(set(complete["available"])) == sorted(SUPPORTED_EXPERIMENTS)
+            assert complete["missing"] == []
+            assert (paths.RESULTS / "summary" / "experiment_comparison.csv").exists()
+            assert (paths.RESULTS / "summary" / "fold_comparison.csv").exists()
+        finally:
+            paths.RESULTS = old_results
 
 
 def check_patch_cache():
@@ -149,6 +284,8 @@ def main():
     assert torch.get_num_interop_threads() == CPU_INTEROP_THREADS
     sf = pd.DataFrame({"fold": ["TEST", "fold2_france", "UNASSIGNED", "fold1_iberia"]})
     assert folds.development_fold_names(sf) == ["fold1_iberia", "fold2_france"]
+    check_experiment_artifacts()
+    check_summary_script_logic()
     check_patch_cache()
     check_configured_pollutant_filtering()
     check_joint_target_masks()
@@ -209,7 +346,7 @@ def main():
         assert rule == "median_cv_best_epoch_ceil"
 
     model_cfg = resnet_cfg("frozen")
-    model = build_model(2, model_cfg, 1)
+    model = build_resnet_model(2, model_cfg, 1)
     assert all(not p.requires_grad for p in model.backbone.parameters())
     model.train()
     assert not model.backbone.training
@@ -229,7 +366,7 @@ def main():
     dummy_forward(model)
 
     layer4_cfg = resnet_cfg("layer4")
-    layer4_model = build_model(2, layer4_cfg, 1)
+    layer4_model = build_resnet_model(2, layer4_cfg, 1)
     for name, p in layer4_model.backbone.named_parameters():
         if not name.startswith("layer4."):
             assert not p.requires_grad
@@ -251,6 +388,7 @@ def main():
     assert layer4_meta["backbone_mode"] == "layer4"
     assert layer4_meta["trainable_layer4_parameters"] == sum(p.numel() for p in groups[1]["params"])
     dummy_forward(layer4_model)
+    check_scratch_cnn()
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
-import torch
 import torch.nn as nn
+
+from shared import multimodal
 
 SUPPORTED_BACKBONE_MODES = {"frozen", "layer4"}
 
@@ -9,10 +10,6 @@ class Net(nn.Module):
         super().__init__()
         import timm
 
-        proj, dropout = cfg["proj_dim"], cfg["dropout"]
-        c1, c2 = cfg["low_cnn_ch1"], cfg["low_cnn_ch2"]
-        s5p_hidden, head_hidden = cfg["s5p_cnn_hidden"], cfg["head_hidden"]
-        wf, df = cfg["wide_feat"], cfg["dem_feat"]
         self.use_wide, self.use_dem = cfg["use_aer_wide"], cfg["use_dem"]
         self.backbone_mode = cfg.get("backbone_mode", "frozen")
         self.lr_head = cfg["lr_head"]
@@ -24,37 +21,7 @@ class Net(nn.Module):
         if pretrained:
             self._load_pretrained()
         self._configure_backbone_trainability()
-        self.proj_h = nn.Linear(feat, proj)
-        self.low_cnn = nn.Sequential(
-            nn.Conv2d(10, c1, 3, padding=1), nn.BatchNorm2d(c1), nn.ReLU(True), nn.MaxPool2d(2),
-            nn.Conv2d(c1, c2, 3, padding=1), nn.BatchNorm2d(c2), nn.ReLU(True),
-            nn.AdaptiveAvgPool2d(1), nn.Flatten(), nn.Dropout(dropout), nn.Linear(c2, 128), nn.ReLU(True))
-        self.s5p_cnn = nn.Sequential(
-            nn.Conv2d(n_s5p, s5p_hidden, 3, padding=1), nn.BatchNorm2d(s5p_hidden), nn.ReLU(True),
-            nn.Conv2d(s5p_hidden, s5p_hidden, 3, padding=1), nn.BatchNorm2d(s5p_hidden), nn.ReLU(True),
-            nn.AdaptiveAvgPool2d(1), nn.Flatten())
-        self.norm_h = nn.BatchNorm1d(proj, affine=False)
-        self.norm_l = nn.BatchNorm1d(128, affine=False)
-        self.norm_s = nn.BatchNorm1d(s5p_hidden, affine=False)
-        n_scalars = n_s5p + int(self.use_wide) + int(self.use_dem)
-        head_in = proj + 128 + s5p_hidden + n_scalars
-        if self.use_wide:
-            self.wide_cnn = nn.Sequential(
-                nn.Conv2d(1, wf, 3, stride=2, padding=1), nn.BatchNorm2d(wf), nn.ReLU(True),
-                nn.Conv2d(wf, wf, 3, stride=2, padding=1), nn.BatchNorm2d(wf), nn.ReLU(True),
-                nn.AdaptiveAvgPool2d(1), nn.Flatten())
-            self.norm_w = nn.BatchNorm1d(wf, affine=False)
-            head_in += wf
-        if self.use_dem:
-            self.dem_cnn = nn.Sequential(
-                nn.Conv2d(1, df, 3, padding=1), nn.BatchNorm2d(df), nn.ReLU(True), nn.MaxPool2d(2),
-                nn.Conv2d(df, df, 3, padding=1), nn.BatchNorm2d(df), nn.ReLU(True),
-                nn.AdaptiveAvgPool2d(1), nn.Flatten())
-            self.norm_d = nn.BatchNorm1d(df, affine=False)
-            head_in += df
-        self.head = nn.Sequential(
-            nn.Dropout(dropout), nn.Linear(head_in, head_hidden), nn.ReLU(True),
-            nn.Dropout(dropout), nn.Linear(head_hidden, n_out))
+        multimodal.init_common_branches(self, n_s5p, cfg, n_out, feat)
 
     def train(self, mode=True):
         super().train(mode)
@@ -126,15 +93,7 @@ class Net(nn.Module):
         print(f"  loaded {n}/{len(sd)} pretrained tensors")
 
     def forward(self, xh, xl, xs_patch, xw, xd, xs_mean):
-        parts = [self.norm_h(self.proj_h(self.backbone(xh))),
-                 self.norm_l(self.low_cnn(xl)),
-                 self.norm_s(self.s5p_cnn(xs_patch))]
-        if self.use_wide:
-            parts.append(self.norm_w(self.wide_cnn(xw)))
-        if self.use_dem:
-            parts.append(self.norm_d(self.dem_cnn(xd)))
-        parts.append(xs_mean)
-        return self.head(torch.cat(parts, dim=1))
+        return multimodal.forward_common(self, xh, xl, xs_patch, xw, xd, xs_mean)
 
 
 def build_model(n_s5p, cfg, n_out):

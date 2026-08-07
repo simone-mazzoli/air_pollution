@@ -1,3 +1,4 @@
+import argparse
 from pathlib import Path
 
 import numpy as np
@@ -6,14 +7,21 @@ import torch.nn as nn
 
 from shared import data, evaluation, folds, runtime, training
 from shared.config import CACHE_PATCHES, DEVICE, MODEL, SEED, result_paths, training_config
-from shared.models import selected_model
+from shared.models import SUPPORTED_EXPERIMENTS, selected_model
+
+
+def parse_args():
+    ap = argparse.ArgumentParser(description="Train the final model for one configured experiment.")
+    ap.add_argument("--experiment", default=MODEL, choices=SUPPORTED_EXPERIMENTS)
+    return ap.parse_args()
 
 
 def main():
     runtime.apply_runtime_config()
     print(runtime.runtime_summary())
+    args = parse_args()
     data.seed_everything()
-    build_model, model_config = selected_model(MODEL)
+    build_model, model_config = selected_model(args.experiment)
     result = result_paths(model_config["experiment"])
     final_epochs, cv_best_epochs, epoch_rule = training.final_epochs_from_cv(
         result["cv_results"], folds.development_fold_names())
@@ -29,7 +37,7 @@ def main():
         buffer_removed = n_before - len(df)
         print(f"buffer {cfg['buffer_km']:g}km: dropped {buffer_removed}/{n_before} "
               "train stations near NE-Germany")
-    print(f"\ndevice: {DEVICE}  |  seed: {SEED}  |  model: {MODEL}  |  final model on ALL {len(df)} "
+    print(f"\ndevice: {DEVICE}  |  seed: {SEED}  |  experiment: {model_config['experiment']}  |  final model on ALL {len(df)} "
           f"CV stations, {cfg['epochs']} epochs (no held-out fold)\n")
 
     tmean = np.array([np.nanmean(np.log(df[p].values)) for p in cfg["pollutants"]], "float64")
@@ -68,7 +76,7 @@ def main():
 
     baseline = evaluation.constant_baseline(df, df, cfg)
     bundle = {
-        "model": MODEL,
+        "model": model_config["model"],
         **meta,
         "state_dict": {k: v.cpu() for k, v in model.state_dict().items()},
         "cfg": cfg,

@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from . import data, evaluation
+from . import data, evaluation, experiment
 from .config import CACHE_PATCHES, DEVICE, DISPLAY
 
 
@@ -96,7 +96,7 @@ def final_epochs_from_cv(cv_results_path, expected_folds):
     return final_epochs, best_epochs, "median_cv_best_epoch_ceil"
 
 
-def train_one_fold(train_df, val_df, streams, cfg, build_model):
+def train_one_fold(train_df, val_df, streams, cfg, build_model, *, fold=None, history_path=None):
     data.seed_everything()
     pollutants = cfg["pollutants"]
     tmean = np.array([np.nanmean(np.log(train_df[p].values)) for p in pollutants], "float64")
@@ -184,15 +184,37 @@ def train_one_fold(train_df, val_df, streams, cfg, build_model):
         total_seconds = time.perf_counter() - epoch_start
         r = mean_val_rmse(val)
         flag = ""
+        best_so_far = False
         if r < best - 1e-4:
             best = r
             best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
             best_epoch = ep
             bad = 0
             flag = " *"
+            best_so_far = True
         else:
             bad += 1
-        print(f"  [{ep:02d}] loss={tot/len(train_df):.3f}")
+        train_loss = tot / len(train_df)
+        if history_path is not None:
+            row = experiment.epoch_history_row(
+                cfg, fold, ep, train_loss, trm, val, opt,
+                {
+                    "train_seconds": train_seconds,
+                    "train_batch_avg_seconds": train_seconds / len(tr),
+                    "train_eval_seconds": train_eval_seconds,
+                    "val_seconds": val_seconds,
+                    "total_seconds": total_seconds,
+                    "data_wait_seconds": train_detail["data_wait"],
+                    "to_device_seconds": train_detail["to_device"],
+                    "forward_seconds": train_detail["forward"],
+                    "backward_seconds": train_detail["backward"],
+                    "optimizer_seconds": train_detail["optimizer"],
+                },
+                best_so_far,
+                bad,
+            )
+            experiment.append_csv_row(history_path, row)
+        print(f"  [{ep:02d}] loss={train_loss:.3f}")
         print(f"       TRAIN  {evaluation.fmt_metrics(trm, cfg)}")
         print(f"       VAL    {evaluation.fmt_metrics(val, cfg)}{flag}")
         print(f"       timing: train={train_seconds:.1f}s "

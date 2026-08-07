@@ -4,7 +4,7 @@ import torch
 from . import paths
 
 # Current experiment
-MODEL = "resnet"
+MODEL = "resnet_frozen"
 POLLUTANTS = ["pm25"]
 S5P_STREAMS = ["no2", "co"]
 USE_AER_WIDE = True
@@ -38,6 +38,9 @@ def result_paths(experiment):
         "dir": result_dir,
         "cv_results": result_dir / "eea_cv_results.json",
         "cv_predictions": result_dir / "eea_cv_predictions.csv",
+        "cv_history": result_dir / "cv_history.csv",
+        "cv_folds": result_dir / "cv_folds.csv",
+        "run_metadata": result_dir / "run_metadata.json",
         "final_checkpoint": result_dir / "final_model.pt",
         "test_predictions": result_dir / "test_predictions.csv",
     }

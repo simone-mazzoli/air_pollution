@@ -1,3 +1,4 @@
+import argparse
 import numpy as np
 import pandas as pd
 import torch
@@ -5,7 +6,13 @@ from torch.utils.data import DataLoader
 
 from shared import data, evaluation, runtime
 from shared.config import BATCH_SIZE, CACHE_PATCHES, DEVICE, DISPLAY, MODEL, NUM_WORKERS, USE_TTA, result_paths
-from shared.models import selected_model
+from shared.models import SUPPORTED_EXPERIMENTS, selected_model
+
+
+def parse_args():
+    ap = argparse.ArgumentParser(description="Predict sealed TEST stations for one configured experiment.")
+    ap.add_argument("--experiment", default=MODEL, choices=SUPPORTED_EXPERIMENTS)
+    return ap.parse_args()
 
 
 @torch.no_grad()
@@ -63,7 +70,8 @@ def report(tag, pred, true, mask, cfg):
 def main():
     runtime.apply_runtime_config()
     print(runtime.runtime_summary())
-    _, model_config = selected_model(MODEL)
+    args = parse_args()
+    _, model_config = selected_model(args.experiment)
     result = result_paths(model_config["experiment"])
     checkpoint = result["final_checkpoint"]
     if not checkpoint.exists():
@@ -73,8 +81,8 @@ def main():
     cfg["pollutants"] = bundle.get("pollutants", cfg["pollutants"])
     if "baseline_concentration" not in bundle:
         raise SystemExit("ERROR: checkpoint is missing arithmetic train-mean baseline metadata. Re-run final training.")
-    build_model, _ = selected_model(MODEL)
-    print(f"loaded {checkpoint}  |  model={MODEL}  |  streams={streams}  "
+    build_model, _ = selected_model(args.experiment)
+    print(f"loaded {checkpoint}  |  experiment={model_config['experiment']}  |  streams={streams}  "
           f"aer_wide={cfg['use_aer_wide']} dem={cfg['use_dem']}  "
           f"pollutants={cfg['pollutants']}  tta={USE_TTA}\n")
     print(f"patch cache: {'enabled' if cfg.get('cache_patches', CACHE_PATCHES) else 'disabled'}")

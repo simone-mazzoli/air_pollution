@@ -1,7 +1,7 @@
 # Custom CNN
 
-This folder is reserved for the required CNN trained from scratch. It is not a
-BigEarthNet-pretrained model.
+This folder contains the custom CNN trained from scratch. It is not a
+BigEarthNet-pretrained model, and it does not load any pretrained weights.
 
 The scratch CNN is needed for the main scientific comparison:
 
@@ -26,6 +26,47 @@ ResNet experiments:
 
 The CNN must not create its own fold assignment or its own TEST split.
 
+## Current High-Resolution Encoder
+
+The first implemented CNN component is the high-resolution Sentinel-2 encoder.
+It replaces only the pretrained ResNet50 branch used for `xh`.
+
+Input:
+
+```text
+10 x 120 x 120 Sentinel-2 patch
+```
+
+Architecture:
+
+```text
+Block 1: 10 -> 32 channels, two 3x3 convolutions, BatchNorm, ReLU, MaxPool
+Block 2: 32 -> 64 channels, two 3x3 convolutions, BatchNorm, ReLU, MaxPool
+Block 3: 64 -> 128 channels, two 3x3 convolutions, BatchNorm, ReLU, MaxPool
+Block 4: 128 -> 256 channels, two 3x3 convolutions, BatchNorm, ReLU, MaxPool
+AdaptiveAvgPool2d(1)
+Flatten
+```
+
+Output:
+
+```text
+256-dimensional high-resolution feature vector
+```
+
+That vector is passed through the same high-resolution projection used by the
+ResNet setup so the shared fusion stage still receives a 64-dimensional
+high-resolution representation.
+
+The rest of the multimodal model is shared with the ResNet experiments:
+
+- lower-resolution Sentinel-2 branch;
+- Sentinel-5P branch;
+- aerosol branch;
+- DEM branch;
+- scalar/context values;
+- fusion and regression head.
+
 ## Expected Model Interface
 
 The shared dataset currently gives each model these tensors:
@@ -47,15 +88,15 @@ The model should return one tensor:
 
 ## Still Open
 
-The CNN architecture is intentionally not decided yet. Open design choices
-include:
+This is only the first scratch-CNN integration step. The high-resolution encoder
+is now implemented, but development-fold CV still has to decide whether this
+capacity and the current training settings are appropriate.
 
-- how deep the high-resolution CNN should be;
-- how to combine high-resolution and lower-resolution image branches;
-- whether the scratch CNN should reuse the current auxiliary branches exactly or
-  only match their input information;
-- dropout and regularization choices;
-- learning rate and weight decay.
+Open choices include:
+
+- whether this compact encoder is the right capacity;
+- whether dropout and regularization should differ from the ResNet comparison;
+- whether learning rate and weight decay should be tuned separately.
 
 Those choices should be made with development-fold CV only, then compared with
 the ResNet runs using the same frozen station assignments and buffer.
