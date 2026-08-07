@@ -296,6 +296,14 @@ ignored. The optimizer is `AdamW`. In frozen ResNet mode, all trainable
 parameters use `lr_head`. In layer4 mode, new pollution parameters use
 `lr_head`, and trainable pretrained layer4 parameters use `lr_layer4`.
 
+`NUM_WORKERS` in `shared/config.py` controls how many extra worker processes
+PyTorch uses for each DataLoader. It currently defaults to `0` because the
+university JupyterHub container has very limited shared memory (`/dev/shm` is
+64 MB). Multiple workers can exceed that limit with these large multimodal
+batches and cause bus errors before training starts. Using `0` loads data in the
+main process. This changes runtime behavior only; it does not change the model,
+folds, inputs, labels, metrics, or scientific experiment.
+
 CV training can run for up to `CV_EPOCHS` epochs. Early stopping watches the
 mean validation RMSE across configured pollutants. `best_epoch` is the one-based
 epoch number with the best validation RMSE. Final training does not use a held

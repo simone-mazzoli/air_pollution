@@ -60,7 +60,7 @@ def train_loader(dataset, cfg):
     if batch <= 1 or n == 1:
         raise ValueError("BatchNorm training needs batches with at least two samples")
     drop_last = n % batch == 1
-    loader = DataLoader(dataset, batch_size=batch, shuffle=True, num_workers=4,
+    loader = DataLoader(dataset, batch_size=batch, shuffle=True, num_workers=cfg["num_workers"],
                         pin_memory=True, drop_last=drop_last, worker_init_fn=data.worker_init)
     n_batches = len(loader)
     if n_batches == 0:
@@ -94,11 +94,11 @@ def train_one_fold(train_df, val_df, streams, cfg, build_model):
     s5p_stats = data.compute_s5p_stats(train_df, streams, cfg)
     tr, loader_info = train_loader(data.EEA(train_df, streams, tmean, tstd, s5p_stats, cfg, augment=True), cfg)
     va = DataLoader(data.EEA(val_df, streams, tmean, tstd, s5p_stats, cfg),
-                    batch_size=cfg["batch"], shuffle=False, num_workers=4,
+                    batch_size=cfg["batch"], shuffle=False, num_workers=cfg["num_workers"],
                     pin_memory=True, worker_init_fn=data.worker_init)
     tsub = train_df.sample(min(1000, len(train_df)), random_state=0)
     tm = DataLoader(data.EEA(tsub, streams, tmean, tstd, s5p_stats, cfg),
-                    batch_size=cfg["batch"], shuffle=False, num_workers=4,
+                    batch_size=cfg["batch"], shuffle=False, num_workers=cfg["num_workers"],
                     pin_memory=True, worker_init_fn=data.worker_init)
     base = evaluation.constant_baseline(train_df, val_df, cfg)
     print("  baseline (train mean): " + "  ".join(

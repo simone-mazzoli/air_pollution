@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from shared import data, evaluation
-from shared.config import BATCH_SIZE, DEVICE, DISPLAY, MODEL, USE_TTA, result_paths
+from shared.config import BATCH_SIZE, DEVICE, DISPLAY, MODEL, NUM_WORKERS, USE_TTA, result_paths
 from shared.models import selected_model
 
 
@@ -81,7 +81,8 @@ def main():
     model = build_model(len(streams), model_cfg, len(cfg["pollutants"])).to(DEVICE)
     model.load_state_dict(bundle["state_dict"])
     ds = data.EEA(df, streams, bundle["tmean"], bundle["tstd"], bundle["s5p_stats"], cfg, augment=False)
-    ld = DataLoader(ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=4, pin_memory=True)
+    ld = DataLoader(ds, batch_size=BATCH_SIZE, shuffle=False,
+                    num_workers=cfg.get("num_workers", NUM_WORKERS), pin_memory=True)
     pred, true, mask = predict(model, ld, bundle["tmean"], bundle["tstd"], cfg, USE_TTA)
 
     print("\n" + "=" * 60 + "\nSEALED TEST SET (east/north German Laender)")

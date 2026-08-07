@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 from torch.utils.data import TensorDataset
 
 from shared import data, evaluation, folds, training
-from shared.config import result_paths
+from shared.config import NUM_WORKERS, result_paths
 from resnet.config import RESNET_CONFIG
 from resnet.model import build_model
 
@@ -52,10 +52,11 @@ def main():
     kept = data.buffer_exclude(train, val, 100.0)
     assert kept["station_code"].tolist() == ["far"]
 
-    cfg = {"batch": 4}
+    cfg = {"batch": 4, "num_workers": NUM_WORKERS}
     for n, batches, drop_last in [(3, 1, False), (8, 2, False), (9, 2, True), (10, 3, False)]:
         loader, info = training.train_loader(TensorDataset(torch.arange(n)), cfg)
         assert len(loader) == batches
+        assert loader.num_workers == NUM_WORKERS
         assert info == {"n_train_samples": n, "n_train_batches": batches, "effective_drop_last": drop_last}
     try:
         training.train_loader(TensorDataset(torch.arange(1)), cfg)

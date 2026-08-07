@@ -19,6 +19,7 @@ Stores shared experiment settings:
 - pollutant list;
 - Sentinel-5P streams;
 - batch size;
+- DataLoader worker count;
 - random seed;
 - 100 km buffer distance;
 - outlier caps for PM10 and PM2.5;
@@ -28,6 +29,12 @@ Stores shared experiment settings:
 
 Model-specific learning rates and architecture sizes should stay in the model
 folder config, such as `resnet/config.py`.
+
+`NUM_WORKERS` controls PyTorch DataLoader multiprocessing. It currently defaults
+to `0` for the university JupyterHub setup because the container has only 64 MB
+of `/dev/shm`. With the large multimodal batches used here, multiple workers can
+hit that shared-memory limit and fail with a bus error. This setting only
+changes how batches are loaded; it does not change the model or experiment.
 
 ### `paths.py`
 
