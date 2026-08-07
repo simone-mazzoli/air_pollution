@@ -4,12 +4,14 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from shared import data, evaluation, folds, training
+from shared import data, evaluation, folds, runtime, training
 from shared.config import CACHE_PATCHES, DEVICE, MODEL, SEED, result_paths, training_config
 from shared.models import selected_model
 
 
 def main():
+    runtime.apply_runtime_config()
+    print(runtime.runtime_summary())
     data.seed_everything()
     build_model, model_config = selected_model(MODEL)
     result = result_paths(model_config["experiment"])

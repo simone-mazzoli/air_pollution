@@ -5,8 +5,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from torch.utils.data import TensorDataset
 
-from shared import data, evaluation, folds, training
-from shared.config import NUM_WORKERS, result_paths
+from shared import data, evaluation, folds, runtime, training
+from shared.config import CPU_INTEROP_THREADS, CPU_THREADS, NUM_WORKERS, result_paths
 from resnet.config import RESNET_CONFIG
 from resnet.model import build_model
 
@@ -86,6 +86,9 @@ def check_patch_cache():
 
 
 def main():
+    runtime.apply_runtime_config()
+    assert torch.get_num_threads() == CPU_THREADS
+    assert torch.get_num_interop_threads() == CPU_INTEROP_THREADS
     sf = pd.DataFrame({"fold": ["TEST", "fold2_france", "UNASSIGNED", "fold1_iberia"]})
     assert folds.development_fold_names(sf) == ["fold1_iberia", "fold2_france"]
     check_patch_cache()

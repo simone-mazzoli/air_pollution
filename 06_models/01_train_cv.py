@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from shared import data, evaluation, folds, training
+from shared import data, evaluation, folds, runtime, training
 from shared.config import CV_EPOCHS, CV_FOLDS, DEVICE, DISPLAY, MODEL, SEED, result_paths, training_config
 from shared.models import selected_model
 
@@ -20,6 +20,8 @@ def parse_args():
 
 
 def main():
+    runtime.apply_runtime_config()
+    print(runtime.runtime_summary())
     args = parse_args()
     data.seed_everything()
     build_model, model_config = selected_model(MODEL)

@@ -313,6 +313,12 @@ are copied before they are returned, so random rotation/flip augmentation cannot
 alter the stored base patch. This is only a runtime optimization and does not
 change the model inputs or experiment.
 
+`CPU_THREADS` and `CPU_INTEROP_THREADS` limit PyTorch CPU parallelism at script
+startup. The current defaults are 8 intra-op threads and 4 inter-op threads.
+This keeps small CPU-side tensor, augmentation, and collation work from trying
+to use every CPU visible inside the JupyterHub container. The scripts print the
+effective values at startup so the runtime setting can be checked.
+
 CV training can run for up to `CV_EPOCHS` epochs. Early stopping watches the
 mean validation RMSE across configured pollutants. `best_epoch` is the one-based
 epoch number with the best validation RMSE. Final training does not use a held

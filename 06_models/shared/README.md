@@ -21,6 +21,7 @@ Stores shared experiment settings:
 - batch size;
 - DataLoader worker count;
 - patch-cache setting;
+- PyTorch CPU thread limits;
 - random seed;
 - 100 km buffer distance;
 - outlier caps for PM10 and PM2.5;
@@ -42,6 +43,12 @@ arrays. It defaults to `True` because `NUM_WORKERS=0` means patch reads happen
 serially in the main process, and rereading the same station files every epoch
 can be slow. The cache uses ordinary process memory, not multiprocessing shared
 memory, and does not change the values passed to the model.
+
+`CPU_THREADS` and `CPU_INTEROP_THREADS` limit PyTorch CPU parallelism. The
+active scripts apply them once at startup through `shared/runtime.py` and print
+the effective settings. This is meant to avoid CPU thread oversubscription on
+the JupyterHub container; it does not change model inputs, labels, folds, or
+metrics.
 
 ### `paths.py`
 

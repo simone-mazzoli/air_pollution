@@ -3,7 +3,7 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 
-from shared import data, evaluation
+from shared import data, evaluation, runtime
 from shared.config import BATCH_SIZE, CACHE_PATCHES, DEVICE, DISPLAY, MODEL, NUM_WORKERS, USE_TTA, result_paths
 from shared.models import selected_model
 
@@ -61,6 +61,8 @@ def report(tag, pred, true, mask, cfg):
 
 
 def main():
+    runtime.apply_runtime_config()
+    print(runtime.runtime_summary())
     _, model_config = selected_model(MODEL)
     result = result_paths(model_config["experiment"])
     checkpoint = result["final_checkpoint"]
