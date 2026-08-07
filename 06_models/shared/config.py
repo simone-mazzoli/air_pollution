@@ -13,6 +13,7 @@ USE_DEM = True
 # Data and leakage control
 BATCH_SIZE = 128
 NUM_WORKERS = 0
+CACHE_PATCHES = True
 BUFFER_KM = 100.0
 MAX_PM10 = 120.0
 MAX_PM25 = 80.0
@@ -65,6 +66,7 @@ STD = np.array(
 SHARED_EXPERIMENT_CONFIG = {
     "batch": BATCH_SIZE,
     "num_workers": NUM_WORKERS,
+    "cache_patches": CACHE_PATCHES,
     "s5p_streams": S5P_STREAMS,
     "use_aer_wide": USE_AER_WIDE,
     "use_dem": USE_DEM,

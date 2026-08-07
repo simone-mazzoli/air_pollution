@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 
 from shared import data, evaluation, folds, training
-from shared.config import DEVICE, MODEL, SEED, result_paths, training_config
+from shared.config import CACHE_PATCHES, DEVICE, MODEL, SEED, result_paths, training_config
 from shared.models import selected_model
 
 
@@ -34,6 +34,7 @@ def main():
     tstd = np.array([np.nanstd(np.log(df[p].values)) or 1.0 for p in cfg["pollutants"]], "float64")
     s5p_stats = data.compute_s5p_stats(df, streams, cfg)
     tr, loader_info = training.train_loader(data.EEA(df, streams, tmean, tstd, s5p_stats, cfg, augment=True), cfg)
+    print(f"patch cache: {'enabled' if cfg.get('cache_patches', CACHE_PATCHES) else 'disabled'}")
 
     model = build_model(len(streams), cfg, len(cfg["pollutants"])).to(DEVICE)
     counts = training.parameter_counts(model)
@@ -58,6 +59,10 @@ def main():
             opt.step()
             tot += loss.item() * len(xh)
         print(f"  [{ep:02d}] loss={tot/len(df):.3f}")
+
+    stats = data.patch_cache_stats(cfg.get("cache_patches", CACHE_PATCHES))
+    if stats["enabled"]:
+        print(f"patch cache final: items={stats['items']} hits={stats['hits']} misses={stats['misses']}")
 
     baseline = evaluation.constant_baseline(df, df, cfg)
     bundle = {

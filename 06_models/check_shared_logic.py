@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import torch
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -39,9 +40,36 @@ def dummy_forward(model):
     assert tuple(model(xh, xl, xs_patch, xw, xd, xs_mean).shape) == (2, 1)
 
 
+def check_patch_cache():
+    with TemporaryDirectory() as td:
+        path = Path(td) / "s2.npy"
+        raw = np.arange(40, dtype="float32").reshape(2, 2, 10) + 1
+        np.save(path, raw)
+
+        data.clear_patch_cache()
+        uncached = data.load_s2(path, cache_patches=False)
+        first = data.load_s2(path, cache_patches=True)
+        first[...] = 999.0
+        second = data.load_s2(path, cache_patches=True)
+        assert np.allclose(second, uncached)
+        assert data.patch_cache_stats()["misses"] == 1
+        assert data.patch_cache_stats()["hits"] == 1
+
+        raw_path = Path(td) / "raw.npy"
+        raw_patch = np.arange(9, dtype="float32").reshape(3, 3, 1)
+        np.save(raw_path, raw_patch)
+        uncached_raw = data.load_patch_raw(raw_path, cache_patches=False)
+        cached_raw = data.load_patch_raw(raw_path, cache_patches=True)
+        cached_raw[...] = -1.0
+        assert np.allclose(data.load_patch_raw(raw_path, cache_patches=True), uncached_raw)
+
+    data.clear_patch_cache()
+
+
 def main():
     sf = pd.DataFrame({"fold": ["TEST", "fold2_france", "UNASSIGNED", "fold1_iberia"]})
     assert folds.development_fold_names(sf) == ["fold1_iberia", "fold2_france"]
+    check_patch_cache()
 
     train = pd.DataFrame({
         "station_code": ["near", "far"],

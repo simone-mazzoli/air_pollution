@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from shared import data, evaluation
-from shared.config import BATCH_SIZE, DEVICE, DISPLAY, MODEL, NUM_WORKERS, USE_TTA, result_paths
+from shared.config import BATCH_SIZE, CACHE_PATCHES, DEVICE, DISPLAY, MODEL, NUM_WORKERS, USE_TTA, result_paths
 from shared.models import selected_model
 
 
@@ -75,6 +75,7 @@ def main():
     print(f"loaded {checkpoint}  |  model={MODEL}  |  streams={streams}  "
           f"aer_wide={cfg['use_aer_wide']} dem={cfg['use_dem']}  "
           f"pollutants={cfg['pollutants']}  tta={USE_TTA}\n")
+    print(f"patch cache: {'enabled' if cfg.get('cache_patches', CACHE_PATCHES) else 'disabled'}")
     df = data.load_test_frame(streams, cfg)
     model_cfg = dict(cfg)
     model_cfg["pretrained"] = False
@@ -84,6 +85,9 @@ def main():
     ld = DataLoader(ds, batch_size=BATCH_SIZE, shuffle=False,
                     num_workers=cfg.get("num_workers", NUM_WORKERS), pin_memory=True)
     pred, true, mask = predict(model, ld, bundle["tmean"], bundle["tstd"], cfg, USE_TTA)
+    stats = data.patch_cache_stats(cfg.get("cache_patches", CACHE_PATCHES))
+    if stats["enabled"]:
+        print(f"patch cache final: items={stats['items']} hits={stats['hits']} misses={stats['misses']}")
 
     print("\n" + "=" * 60 + "\nSEALED TEST SET (east/north German Laender)")
     baseline_report(true, mask, bundle["baseline_concentration"], cfg)

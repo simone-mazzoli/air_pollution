@@ -7,7 +7,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from . import data, evaluation
-from .config import DEVICE, DISPLAY
+from .config import CACHE_PATCHES, DEVICE, DISPLAY
 
 
 def masked_loss(pred, y, mask, lossf):
@@ -107,6 +107,7 @@ def train_one_fold(train_df, val_df, streams, cfg, build_model):
                     batch_size=cfg["batch"], shuffle=False, num_workers=cfg["num_workers"],
                     pin_memory=True, worker_init_fn=data.worker_init)
     base = evaluation.constant_baseline(train_df, val_df, cfg)
+    print(f"  patch cache: {'enabled' if cfg.get('cache_patches', CACHE_PATCHES) else 'disabled'}")
     print("  baseline (train mean): " + "  ".join(
         f"{DISPLAY[p]} mean={base[p]['mean']:.2f} RMSE={base[p]['rmse']:.2f}" for p in pollutants))
     model = build_model(len(streams), cfg, len(pollutants)).to(DEVICE)
@@ -173,6 +174,9 @@ def train_one_fold(train_df, val_df, streams, cfg, build_model):
             break
     model.load_state_dict(best_state)
     val, arrs = evaluation.evaluate(model, va, tmean, tstd, cfg, tta=cfg["tta"])
+    stats = data.patch_cache_stats(cfg.get("cache_patches", CACHE_PATCHES))
+    if stats["enabled"]:
+        print(f"  patch cache final: items={stats['items']} hits={stats['hits']} misses={stats['misses']}")
     out = {"n_train": len(train_df), "n_val": len(val_df),
            "best_epoch": best_epoch, "epochs_run": epochs_run,
            "best_validation_metric": best,

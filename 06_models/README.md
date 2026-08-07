@@ -304,6 +304,15 @@ batches and cause bus errors before training starts. Using `0` loads data in the
 main process. This changes runtime behavior only; it does not change the model,
 folds, inputs, labels, metrics, or scientific experiment.
 
+With `NUM_WORKERS=0`, patch files are read serially in the main process.
+Repeated `.npy` reads can become slow because the same station patches are used
+again every epoch. The shared Dataset therefore keeps loaded patches in ordinary
+process RAM when `CACHE_PATCHES=True`. The cache is lazy: a patch is loaded from
+disk the first time it is requested, then reused from RAM later. Cached arrays
+are copied before they are returned, so random rotation/flip augmentation cannot
+alter the stored base patch. This is only a runtime optimization and does not
+change the model inputs or experiment.
+
 CV training can run for up to `CV_EPOCHS` epochs. Early stopping watches the
 mean validation RMSE across configured pollutants. `best_epoch` is the one-based
 epoch number with the best validation RMSE. Final training does not use a held
@@ -409,6 +418,7 @@ It currently checks:
 - the 100 km spatial leakage buffer;
 - DataLoader partial-batch behavior;
 - singleton-batch handling for BatchNorm safety;
+- patch-cache reuse and cached-array mutation protection;
 - arithmetic train-mean baseline behavior;
 - prediction metadata;
 - separate result paths for each experiment;

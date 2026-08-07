@@ -20,6 +20,7 @@ Stores shared experiment settings:
 - Sentinel-5P streams;
 - batch size;
 - DataLoader worker count;
+- patch-cache setting;
 - random seed;
 - 100 km buffer distance;
 - outlier caps for PM10 and PM2.5;
@@ -35,6 +36,12 @@ to `0` for the university JupyterHub setup because the container has only 64 MB
 of `/dev/shm`. With the large multimodal batches used here, multiple workers can
 hit that shared-memory limit and fail with a bus error. This setting only
 changes how batches are loaded; it does not change the model or experiment.
+
+`CACHE_PATCHES` controls a lazy in-process RAM cache for loaded `.npy` patch
+arrays. It defaults to `True` because `NUM_WORKERS=0` means patch reads happen
+serially in the main process, and rereading the same station files every epoch
+can be slow. The cache uses ordinary process memory, not multiprocessing shared
+memory, and does not change the values passed to the model.
 
 ### `paths.py`
 
@@ -57,6 +64,7 @@ the generated file instead of rebuilding fold membership during training.
 Loads labels and patches, prepares station-level annual labels, applies label
 filters, checks patch availability, applies Sentinel-2 and Sentinel-5P
 normalization, builds the PyTorch dataset, and applies the 100 km spatial buffer.
+It also owns the lazy patch cache used by active training and prediction runs.
 
 It also contains the rotation/flip training augmentation used by the current
 experiments.

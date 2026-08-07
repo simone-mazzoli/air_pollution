@@ -6,7 +6,11 @@ import torch
 from torch.utils.data import Dataset
 
 from . import folds, paths
-from .config import CUDNN_DETERMINISTIC, MEAN, RELIEF_SCALE, SEED, STD, DISPLAY
+from .config import CACHE_PATCHES, CUDNN_DETERMINISTIC, MEAN, RELIEF_SCALE, SEED, STD, DISPLAY
+
+_PATCH_CACHE = {}
+_PATCH_CACHE_HITS = 0
+_PATCH_CACHE_MISSES = 0
 
 
 def seed_everything(seed=SEED):
@@ -24,7 +28,37 @@ def worker_init(worker_id):
     random.seed(SEED + worker_id)
 
 
-def load_s2(path):
+def clear_patch_cache():
+    global _PATCH_CACHE_HITS, _PATCH_CACHE_MISSES
+    _PATCH_CACHE.clear()
+    _PATCH_CACHE_HITS = 0
+    _PATCH_CACHE_MISSES = 0
+
+
+def patch_cache_stats(cache_patches=CACHE_PATCHES):
+    return {
+        "enabled": cache_patches,
+        "items": len(_PATCH_CACHE),
+        "hits": _PATCH_CACHE_HITS,
+        "misses": _PATCH_CACHE_MISSES,
+    }
+
+
+def _cached_array(kind, path, loader, cache_patches=CACHE_PATCHES):
+    global _PATCH_CACHE_HITS, _PATCH_CACHE_MISSES
+    if not cache_patches:
+        return loader(path)
+    key = (kind, str(path.resolve()))
+    if key in _PATCH_CACHE:
+        _PATCH_CACHE_HITS += 1
+        return _PATCH_CACHE[key].copy()
+    arr = loader(path)
+    _PATCH_CACHE[key] = arr.copy()
+    _PATCH_CACHE_MISSES += 1
+    return arr.copy()
+
+
+def _load_s2_uncached(path):
     arr = np.load(path)
     nodata = ~np.isfinite(arr) | (arr <= 0)
     safe = np.where(nodata, 0.0, arr).astype("float32")
@@ -33,15 +67,23 @@ def load_s2(path):
     return np.transpose(normed, (2, 0, 1))
 
 
-def load_patch_raw(path):
+def load_s2(path, cache_patches=CACHE_PATCHES):
+    return _cached_array("s2", path, _load_s2_uncached, cache_patches)
+
+
+def _load_patch_raw_uncached(path):
     arr = np.load(path).astype("float32")
     if arr.ndim == 3:
         arr = arr[..., 0] if arr.shape[-1] == 1 else arr.mean(axis=-1)
     return arr
 
 
-def load_dem(path):
-    raw = load_patch_raw(path)
+def load_patch_raw(path, cache_patches=CACHE_PATCHES):
+    return _cached_array("raw", path, _load_patch_raw_uncached, cache_patches)
+
+
+def load_dem(path, cache_patches=CACHE_PATCHES):
+    raw = load_patch_raw(path, cache_patches)
     finite = raw[np.isfinite(raw)]
     fallback = float(finite.mean()) if len(finite) else 0.0
     h, w = raw.shape
@@ -147,7 +189,7 @@ def compute_s5p_stats(train_df, streams, cfg):
     for key, d in dirs.items():
         pixels = []
         for code in train_df["station_code"]:
-            raw = load_patch_raw(d / f"{code}.npy")
+            raw = load_patch_raw(d / f"{code}.npy", cfg.get("cache_patches", CACHE_PATCHES))
             valid = raw[np.isfinite(raw)]
             if len(valid):
                 pixels.append(valid.astype("float64"))
@@ -171,15 +213,16 @@ class EEA(Dataset):
 
     def _norm_s5p(self, path, key):
         m, sd = self.s5p_stats[key]
-        raw = load_patch_raw(path)
+        raw = load_patch_raw(path, self.cfg.get("cache_patches", CACHE_PATCHES))
         safe = np.where(np.isfinite(raw), raw, m)
         return ((safe - m) / sd if sd > 0 else np.zeros_like(safe)).astype("float32")
 
     def __getitem__(self, i):
         r = self.f.iloc[i]
         code = r["station_code"]
-        xh = torch.from_numpy(load_s2(paths.HIGH / f"{code}.npy"))
-        xl = torch.from_numpy(load_s2(paths.LOW / f"{code}.npy"))
+        cache_patches = self.cfg.get("cache_patches", CACHE_PATCHES)
+        xh = torch.from_numpy(load_s2(paths.HIGH / f"{code}.npy", cache_patches))
+        xl = torch.from_numpy(load_s2(paths.LOW / f"{code}.npy", cache_patches))
         chans = [self._norm_s5p(paths.SAT / st / f"{code}.npy", st) for st in self.streams]
         xs_patch = torch.from_numpy(np.stack(chans, axis=0))
         extras = []
@@ -190,7 +233,7 @@ class EEA(Dataset):
         else:
             xw = torch.zeros(1, 1, 1)
         if self.cfg["use_dem"]:
-            relief, elev = load_dem(paths.DEMD / f"{code}.npy")
+            relief, elev = load_dem(paths.DEMD / f"{code}.npy", cache_patches)
             xd = torch.from_numpy(relief)
             extras.append(elev / 1000.0)
         else:
