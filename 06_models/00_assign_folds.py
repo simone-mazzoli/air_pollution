@@ -31,37 +31,14 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")               # no display needed; write PNG straight to disk
 import matplotlib.pyplot as plt
+from shared import folds, paths
 
-BASE = Path(__file__).resolve().parent.parent
-PROC = BASE / "data" / "processed"
-LABELS = PROC / "daily_avg" / "eea" / "pm_reference_stations_2024.csv"
-STATION_LAND = PROC / "uba" / "station_land.csv"   # station_code -> land (DEUB resolved)
-OUT_CSV = PROC / "eea" / "station_fold.csv"
-OUT_PLOT = PROC / "eea" / "fold_map.png"
-
-FOLDS = {
-    "fold1_iberia": ["PT", "ES", "AD"],
-    "fold2_france": ["FR", "NL", "BE", "LU"],  
-    "fold3_italy": ["IT", "MT"],
-    "fold4_alpine": ["DE", "CH", "AT"],   # DE = western/southern Laender only
-    "fold5_north": ["DK", "SE", "NO", "FI", "IS", "IE", "LT", "LV", "EE"],
-    "fold6_balkan_e": ["HU", "SI", "HR", "BA", "RS", "XK", "ME", "RO", "BG"], 
-    "fold7_balkan_s": ["AL", "GR", "CY", "TR", "MK"],   
-    "fold8_poland": ["PL", "CZ", "SK"],  
-}
-# SEALED TEST SET = eastern + northern German Laender ONLY: never trained on,
-# never a CV fold -> labelled "TEST" here. Western/southern German Laender stay
-# in fold4_alpine. There are no whole-country test members anymore.
-COUNTRY_TO_FOLD = {cc: f for f, ccs in FOLDS.items() for cc in ccs}
-
-DE_TEST_LAENDER = {
-    "Brandenburg", "Mecklenburg-Vorpommern", "Sachsen", "Sachsen-Anhalt",
-    "Thueringen", "Berlin",                                       # east
-    "Hamburg", "Bremen", "Niedersachsen", "Schleswig-Holstein",  # north
-}
+LABELS = paths.LABELS
+OUT_CSV = paths.STATION_FOLD
+OUT_PLOT = paths.FOLD_MAP
 
 # stable colour per fold for the QC plot; test set + unassigned get greys
-FOLD_ORDER = list(FOLDS)
+FOLD_ORDER = folds.FOLD_ORDER
 CMAP = plt.get_cmap("tab10")
 FOLD_COLOR = {f: CMAP(i % 10) for i, f in enumerate(FOLD_ORDER)}
 FOLD_COLOR["TEST"] = (0.35, 0.35, 0.35, 1.0)
@@ -76,22 +53,13 @@ def _find_col(df, cands):
 
 
 def load_de_land():
-    if STATION_LAND.exists():
-        sl = pd.read_csv(STATION_LAND, dtype={"station_code": str})
-        return dict(zip(sl["station_code"], sl["land"]))
-    print(f"WARNING: {STATION_LAND} not found -- no German Land split; all DE -> fold4_alpine")
-    return {}
+    return folds.load_de_land()
 
 
 def assign_fold(code, de_land):
     """CV fold, or 'TEST' for the sealed set (east/north German Laender ONLY), or
     None if unlisted. Other DE (west/south) -> fold4_alpine."""
-    cc = code[:2]
-    if cc == "DE":
-        land = de_land.get(code)
-        if land in DE_TEST_LAENDER:
-            return "TEST"                 # east/north DE -> sealed test set
-    return COUNTRY_TO_FOLD.get(cc)   # None if the country isn't in any cluster
+    return folds.assign_fold(code, de_land)
 
 
 def build_table():

@@ -1,0 +1,2 @@
+"""Shared EEA modeling helpers."""
+
