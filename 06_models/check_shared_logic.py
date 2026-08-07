@@ -42,26 +42,45 @@ def dummy_forward(model):
 
 def check_patch_cache():
     with TemporaryDirectory() as td:
-        path = Path(td) / "s2.npy"
+        patch_dir = Path(td) / "high"
+        patch_dir.mkdir()
+        path = patch_dir / "station_a.npy"
         raw = np.arange(40, dtype="float32").reshape(2, 2, 10) + 1
         np.save(path, raw)
 
         data.clear_patch_cache()
-        uncached = data.load_s2(path, cache_patches=False)
-        first = data.load_s2(path, cache_patches=True)
+        uncached = data.load_s2_station(patch_dir, "high", "station_a", cache_patches=False)
+        first = data.load_s2_station(patch_dir, "high", "station_a", cache_patches=True)
         first[...] = 999.0
-        second = data.load_s2(path, cache_patches=True)
+        original_resolve = Path.resolve
+        original_load = np.load
+        try:
+            Path.resolve = lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError("cache hit must not resolve paths")
+            )
+            np.load = lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError("cache hit must not load files")
+            )
+            second = data.load_s2_station(patch_dir, "high", "station_a", cache_patches=True)
+        finally:
+            Path.resolve = original_resolve
+            np.load = original_load
         assert np.allclose(second, uncached)
         assert data.patch_cache_stats()["misses"] == 1
         assert data.patch_cache_stats()["hits"] == 1
 
-        raw_path = Path(td) / "raw.npy"
+        raw_dir = Path(td) / "raw"
+        raw_dir.mkdir()
+        raw_path = raw_dir / "station_a.npy"
         raw_patch = np.arange(9, dtype="float32").reshape(3, 3, 1)
         np.save(raw_path, raw_patch)
-        uncached_raw = data.load_patch_raw(raw_path, cache_patches=False)
-        cached_raw = data.load_patch_raw(raw_path, cache_patches=True)
+        uncached_raw = data.load_patch_raw_station(raw_dir, "raw", "station_a", cache_patches=False)
+        cached_raw = data.load_patch_raw_station(raw_dir, "raw", "station_a", cache_patches=True)
         cached_raw[...] = -1.0
-        assert np.allclose(data.load_patch_raw(raw_path, cache_patches=True), uncached_raw)
+        assert np.allclose(
+            data.load_patch_raw_station(raw_dir, "raw", "station_a", cache_patches=True),
+            uncached_raw,
+        )
 
     data.clear_patch_cache()
 
