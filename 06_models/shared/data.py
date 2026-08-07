@@ -160,13 +160,22 @@ def _with_fold_columns(ann, station_folds):
     return ann.merge(sf, on="station_code", how="left")
 
 
-def _apply_label_filters(ann, cfg):
+def _apply_label_caps(ann, cfg):
     for p, cap in (("pm10", cfg["max_pm10"]), ("pm25", cfg["max_pm25"])):
         n_out = int((ann[p] > cap).sum())
         if n_out:
             print(f"  outlier filter {DISPLAY[p]}: {n_out} stations above {cap:g} ug/m3 -> label dropped")
         ann.loc[(ann[p] <= 0) | (ann[p] > cap), p] = np.nan
-    return ann[ann[["pm10", "pm25"]].notna().any(axis=1)].reset_index(drop=True)
+    return ann
+
+
+def _filter_configured_targets(ann, cfg):
+    pollutants = cfg["pollutants"]
+    return ann[ann[pollutants].notna().any(axis=1)].reset_index(drop=True)
+
+
+def _apply_label_filters(ann, cfg):
+    return _filter_configured_targets(_apply_label_caps(ann, cfg), cfg)
 
 
 def _has_all_patches(code, streams, cfg):
@@ -184,14 +193,18 @@ def load_frame(streams, cfg):
     dropped = ann[ann["fold"].isna() | (ann["fold"] == "UNASSIGNED")]["country"].value_counts()
     ann.loc[ann["fold"].isin(["TEST", "UNASSIGNED"]), "fold"] = np.nan
     ann = ann.dropna(subset=["fold"]).reset_index(drop=True)
-    ann = _apply_label_filters(ann, cfg)
+    ann = _apply_label_caps(ann, cfg)
+    patch_keep = ann["station_code"].map(lambda code: _has_all_patches(code, streams, cfg))
+    patch_complete = int(patch_keep.sum())
+    ann = _filter_configured_targets(ann, cfg)
     keep = ann["station_code"].map(lambda code: _has_all_patches(code, streams, cfg))
-    print(f"{len(ann)} CV stations (after outlier + test/unlisted removal) -> "
-          f"{int(keep.sum())} with all patches")
+    print(f"{patch_complete} CV stations with all patches before target filtering")
+    print(f"{len(ann)} CV stations with configured targets {cfg['pollutants']} -> "
+          f"{int(keep.sum())} model-ready with all patches")
     if len(dropped):
         print(f"  dropped unlisted countries: {dict(dropped)}")
     ann = ann[keep].reset_index(drop=True)
-    print("  stations per fold (total / with PM10 / with PM2.5):")
+    print("  model-ready stations per fold (total / with PM10 / with PM2.5):")
     for fold in folds.development_fold_names(sf):
         sub = ann[ann["fold"] == fold]
         print(f"    {fold:<16} {len(sub):>4}  /  {int(sub['pm10'].notna().sum()):>4}  "
@@ -204,9 +217,14 @@ def load_test_frame(streams, cfg):
     ann = _with_fold_columns(_annual_labels(), sf)
     ann = ann[ann["fold"] == "TEST"].reset_index(drop=True)
     ann["group"] = ann["station_code"].map(lambda code: "DE_ne" if code[:2] == "DE" else code[:2])
-    ann = _apply_label_filters(ann, cfg)
+    ann = _apply_label_caps(ann, cfg)
+    patch_keep = ann["station_code"].map(lambda code: _has_all_patches(code, streams, cfg))
+    patch_complete = int(patch_keep.sum())
+    ann = _filter_configured_targets(ann, cfg)
     keep = ann["station_code"].map(lambda code: _has_all_patches(code, streams, cfg))
-    print(f"{len(ann)} sealed-TEST stations -> {int(keep.sum())} with all patches")
+    print(f"{patch_complete} sealed-TEST stations with all patches before target filtering")
+    print(f"{len(ann)} sealed-TEST stations with configured targets {cfg['pollutants']} -> "
+          f"{int(keep.sum())} model-ready with all patches")
     ann = ann[keep].reset_index(drop=True)
     for grp in sorted(ann["group"].unique()):
         sub = ann[ann["group"] == grp]

@@ -282,6 +282,10 @@ versus features learned from scratch.
 ## Training And Evaluation
 
 The current target is `pm25`, but the shared code can also carry `pm10`.
+Station inclusion follows the configured pollutant list. A PM2.5-only run keeps
+stations with valid PM2.5 labels, a PM10-only run keeps stations with valid PM10
+labels, and a joint PM10+PM2.5 run keeps stations with at least one of those
+configured targets.
 
 Targets are transformed inside the dataset:
 
@@ -291,10 +295,13 @@ Targets are transformed inside the dataset:
 - predictions are transformed back with `exp()` before RMSE, MAE, and R2 are
   reported.
 
-Training uses `SmoothL1Loss` with a mask so missing pollutant labels can be
-ignored. The optimizer is `AdamW`. In frozen ResNet mode, all trainable
-parameters use `lr_head`. In layer4 mode, new pollution parameters use
-`lr_head`, and trainable pretrained layer4 parameters use `lr_layer4`.
+Training uses `SmoothL1Loss`. When more than one pollutant is configured, a mask
+lets the model ignore missing labels for the pollutant that is absent at a
+station. In single-pollutant runs, stations without that pollutant are filtered
+out before they enter the Dataset. The optimizer is `AdamW`. In frozen ResNet
+mode, all trainable parameters use `lr_head`. In layer4 mode, new pollution
+parameters use `lr_head`, and trainable pretrained layer4 parameters use
+`lr_layer4`.
 
 `NUM_WORKERS` in `shared/config.py` controls how many extra worker processes
 PyTorch uses for each DataLoader. It currently defaults to `0` because the

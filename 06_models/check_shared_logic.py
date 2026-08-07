@@ -85,6 +85,64 @@ def check_patch_cache():
     data.clear_patch_cache()
 
 
+def check_configured_pollutant_filtering():
+    frame = pd.DataFrame({
+        "station_code": ["pm10_only", "pm25_only", "both", "neither"],
+        "pm10": [12.0, np.nan, 13.0, np.nan],
+        "pm25": [np.nan, 7.0, 8.0, np.nan],
+    })
+    cfg = {"max_pm10": 120.0, "max_pm25": 80.0}
+
+    pm25 = data._apply_label_filters(frame.copy(), {**cfg, "pollutants": ["pm25"]})
+    assert pm25["station_code"].tolist() == ["pm25_only", "both"]
+
+    pm10 = data._apply_label_filters(frame.copy(), {**cfg, "pollutants": ["pm10"]})
+    assert pm10["station_code"].tolist() == ["pm10_only", "both"]
+
+    joint = data._apply_label_filters(frame.copy(), {**cfg, "pollutants": ["pm10", "pm25"]})
+    assert joint["station_code"].tolist() == ["pm10_only", "pm25_only", "both"]
+
+
+def check_joint_target_masks():
+    with TemporaryDirectory() as td:
+        root = Path(td)
+        for name in ("high", "low", "no2_tropomi"):
+            (root / name).mkdir()
+        for code in ("pm10_only", "pm25_only"):
+            np.save(root / "high" / f"{code}.npy", np.ones((2, 2, 10), dtype="float32"))
+            np.save(root / "low" / f"{code}.npy", np.ones((2, 2, 10), dtype="float32"))
+            np.save(root / "no2_tropomi" / f"{code}.npy", np.ones((2, 2), dtype="float32"))
+
+        old_high, old_low, old_sat = data.paths.HIGH, data.paths.LOW, data.paths.SAT
+        try:
+            data.paths.HIGH = root / "high"
+            data.paths.LOW = root / "low"
+            data.paths.SAT = root
+            ds = data.EEA(
+                pd.DataFrame({
+                    "station_code": ["pm10_only", "pm25_only"],
+                    "pm10": [12.0, np.nan],
+                    "pm25": [np.nan, 7.0],
+                }),
+                ["no2_tropomi"],
+                np.array([2.0, 2.0]),
+                np.array([1.0, 1.0]),
+                {"no2_tropomi": (1.0, 1.0)},
+                {
+                    "pollutants": ["pm10", "pm25"],
+                    "use_aer_wide": False,
+                    "use_dem": False,
+                    "cache_patches": False,
+                },
+            )
+            assert ds[0][-1].tolist() == [1.0, 0.0]
+            assert ds[1][-1].tolist() == [0.0, 1.0]
+        finally:
+            data.paths.HIGH = old_high
+            data.paths.LOW = old_low
+            data.paths.SAT = old_sat
+
+
 def main():
     runtime.apply_runtime_config()
     assert torch.get_num_threads() == CPU_THREADS
@@ -92,6 +150,8 @@ def main():
     sf = pd.DataFrame({"fold": ["TEST", "fold2_france", "UNASSIGNED", "fold1_iberia"]})
     assert folds.development_fold_names(sf) == ["fold1_iberia", "fold2_france"]
     check_patch_cache()
+    check_configured_pollutant_filtering()
+    check_joint_target_masks()
 
     train = pd.DataFrame({
         "station_code": ["near", "far"],

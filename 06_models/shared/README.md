@@ -73,6 +73,11 @@ filters, checks patch availability, applies Sentinel-2 and Sentinel-5P
 normalization, builds the PyTorch dataset, and applies the 100 km spatial buffer.
 It also owns the lazy patch cache used by active training and prediction runs.
 
+Station filtering follows `cfg["pollutants"]`: a station is kept only if it has
+at least one valid target among the pollutants configured for that run. The
+target mask is mainly for joint pollutant training, where a station may have
+PM10 but not PM2.5, or the other way around.
+
 It also contains the rotation/flip training augmentation used by the current
 experiments.
 
