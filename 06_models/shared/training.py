@@ -1,6 +1,7 @@
 import json
 import math
 import numpy as np
+import time
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -12,6 +13,11 @@ from .config import DEVICE, DISPLAY
 def masked_loss(pred, y, mask, lossf):
     per = lossf(pred, y)
     return (per * mask).sum() / mask.sum().clamp(min=1)
+
+
+def sync_if_cuda():
+    if DEVICE == "cuda":
+        torch.cuda.synchronize()
 
 
 def parameter_counts(model):
@@ -120,8 +126,11 @@ def train_one_fold(train_df, val_df, streams, cfg, build_model):
     best, best_state, best_epoch, bad, epochs_run = np.inf, None, None, 0, 0
     for ep in range(1, cfg["epochs"] + 1):
         epochs_run = ep
+        sync_if_cuda()
+        epoch_start = time.perf_counter()
         model.train()
         tot = 0.0
+        train_start = time.perf_counter()
         for xh, xl, xs_patch, xw, xd, xs_mean, y, m in tr:
             xh, xl, xs_patch, xw, xd, xs_mean, y, m = (
                 xh.to(DEVICE), xl.to(DEVICE), xs_patch.to(DEVICE), xw.to(DEVICE),
@@ -131,8 +140,17 @@ def train_one_fold(train_df, val_df, streams, cfg, build_model):
             loss.backward()
             opt.step()
             tot += loss.item() * len(xh)
+        sync_if_cuda()
+        train_seconds = time.perf_counter() - train_start
+        train_eval_start = time.perf_counter()
         trm, _ = evaluation.evaluate(model, tm, tmean, tstd, cfg)
+        sync_if_cuda()
+        train_eval_seconds = time.perf_counter() - train_eval_start
+        val_start = time.perf_counter()
         val, _ = evaluation.evaluate(model, va, tmean, tstd, cfg, tta=cfg["tta"])
+        sync_if_cuda()
+        val_seconds = time.perf_counter() - val_start
+        total_seconds = time.perf_counter() - epoch_start
         r = mean_val_rmse(val)
         flag = ""
         if r < best - 1e-4:
@@ -146,6 +164,10 @@ def train_one_fold(train_df, val_df, streams, cfg, build_model):
         print(f"  [{ep:02d}] loss={tot/len(train_df):.3f}")
         print(f"       TRAIN  {evaluation.fmt_metrics(trm, cfg)}")
         print(f"       VAL    {evaluation.fmt_metrics(val, cfg)}{flag}")
+        print(f"       timing: train={train_seconds:.1f}s "
+              f"train_batch_avg={train_seconds / len(tr):.2f}s "
+              f"train_eval={train_eval_seconds:.1f}s "
+              f"val={val_seconds:.1f}s total={total_seconds:.1f}s")
         if bad >= cfg["patience"]:
             print("  early stop")
             break

@@ -309,6 +309,11 @@ mean validation RMSE across configured pollutants. `best_epoch` is the one-based
 epoch number with the best validation RMSE. Final training does not use a held
 out fold; its epoch count is the ceiling of the median CV `best_epoch` values.
 
+Each CV epoch also prints a compact timing line for the training pass, average
+training batch time, train-subset evaluation, validation evaluation with the
+current TTA setting, and total epoch time. This is only logging; it is there to
+help diagnose runtime bottlenecks without changing the model or experiment.
+
 Metrics:
 
 - RMSE is root mean squared error in the original concentration units.
