@@ -41,8 +41,10 @@ def optimizer_parameter_groups(model, cfg):
     if hasattr(model, "optimizer_parameter_groups"):
         groups = model.optimizer_parameter_groups(cfg)
     else:
+        lr = cfg["lr"] if "lr" in cfg else cfg["lr_head"]
+        weight_decay = cfg["weight_decay"] if "weight_decay" in cfg else cfg["wd_head"]
         groups = [{"params": trainable_parameters(model),
-                   "lr": cfg["lr_head"], "weight_decay": cfg["wd_head"]}]
+                   "lr": lr, "weight_decay": weight_decay}]
     grouped = [p for g in groups for p in g["params"]]
     trainable = trainable_parameters(model)
     if len({id(p) for p in grouped}) != len(grouped):

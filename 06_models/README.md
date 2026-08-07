@@ -25,7 +25,7 @@ The immediate comparison is:
 
 - a BigEarthNet-pretrained ResNet50 used for transfer learning;
 - a partially fine-tuned version of the same ResNet50;
-- a later CNN trained from scratch.
+- a CNN trained from scratch.
 
 BigEarthNet is a large remote-sensing dataset. Pretraining on it gives the
 ResNet useful satellite-image features before it is trained for pollution. The
@@ -70,8 +70,7 @@ predictions.
   shared configuration.
 - `resnet/` contains the BigEarthNet-pretrained ResNet model and ResNet-specific
   settings.
-- `cnn/` is reserved for the required CNN trained from scratch. Its architecture
-  is not finalized yet.
+- `cnn/` contains the scratch-CNN model and its CNN-specific settings.
 - `results/` contains generated CV results, checkpoints, and prediction CSVs.
 - `archive/` keeps older Sensor.Community work that is no longer part of the
   current EEA reference-station pipeline.
@@ -296,10 +295,10 @@ scalar/context values             -> patch means and elevation
 all learned representations + scalar/context values -> regression head -> annual PM2.5
 ```
 
-The comparison with the future scratch CNN should keep the non-high-resolution
-branches and fusion setup the same where possible. That way, the main difference
-being tested is the high-resolution image encoder: pretrained ResNet features
-versus features learned from scratch.
+The comparison with the scratch CNN keeps the non-high-resolution branches and
+fusion setup the same where possible. That way, the main difference being tested
+is the high-resolution image encoder: pretrained ResNet features versus features
+learned from scratch.
 
 ## Training And Evaluation
 
@@ -323,7 +322,8 @@ station. In single-pollutant runs, stations without that pollutant are filtered
 out before they enter the Dataset. The optimizer is `AdamW`. In frozen ResNet
 mode, all trainable parameters use `lr_head`. In layer4 mode, new pollution
 parameters use `lr_head`, and trainable pretrained layer4 parameters use
-`lr_layer4`.
+`lr_layer4`. In CNN mode, all trainable CNN parameters currently share one
+optimizer group using `lr` and `weight_decay`.
 
 `NUM_WORKERS` in `shared/config.py` controls how many extra worker processes
 PyTorch uses for each DataLoader. It currently defaults to `0` because the

@@ -67,6 +67,21 @@ The rest of the multimodal model is shared with the ResNet experiments:
 - scalar/context values;
 - fusion and regression head.
 
+## Current Optimization Settings
+
+All trainable CNN parameters are currently optimized together in one AdamW
+parameter group:
+
+```text
+lr            3e-4
+weight_decay  1e-7
+dropout       0.5
+```
+
+`dropout=0.5` means the shared dropout layers drop 50% of activations during
+training. There is not yet a separate learning rate for the scratch
+high-resolution encoder versus the shared branches and regression head.
+
 ## Expected Model Interface
 
 The shared dataset currently gives each model these tensors:
@@ -95,8 +110,9 @@ capacity and the current training settings are appropriate.
 Open choices include:
 
 - whether this compact encoder is the right capacity;
-- whether dropout and regularization should differ from the ResNet comparison;
-- whether learning rate and weight decay should be tuned separately.
+- whether the current CNN-specific learning rate, dropout, and weight decay are
+  best;
+- whether learning rate and weight decay should be split by parameter group.
 
 Those choices should be made with development-fold CV only, then compared with
 the ResNet runs using the same frozen station assignments and buffer.

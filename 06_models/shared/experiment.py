@@ -46,7 +46,7 @@ def optimizer_lrs(opt, cfg):
     for i, group in enumerate(groups):
         out[f"lr_group_{i}"] = group["lr"]
     if groups:
-        out["lr_head"] = groups[0]["lr"]
+        out["lr" if cfg.get("experiment") == "cnn" else "lr_head"] = groups[0]["lr"]
     if cfg.get("experiment") == "resnet_layer4" and len(groups) > 1:
         out["lr_layer4"] = groups[1]["lr"]
     return out

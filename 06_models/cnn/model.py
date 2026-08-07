@@ -33,7 +33,7 @@ class Net(nn.Module):
     def __init__(self, n_s5p, cfg, n_out):
         super().__init__()
         self.backbone = ScratchHighEncoder()
-        self.lr_head = cfg["lr_head"]
+        self.lr = cfg["lr"]
         multimodal.init_common_branches(self, n_s5p, cfg, n_out, self.backbone.feature_dim)
 
     def parameter_metadata(self):
@@ -44,7 +44,7 @@ class Net(nn.Module):
             "experiment": "cnn",
             "high_encoder": "scratch_cnn_32_64_128_256",
             "high_encoder_feature_dim": self.backbone.feature_dim,
-            "lr_head": self.lr_head,
+            "lr": self.lr,
             "trainable_high_encoder_parameters": high_trainable,
             "trainable_non_high_encoder_parameters": total_trainable - high_trainable,
         }

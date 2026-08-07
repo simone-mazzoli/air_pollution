@@ -60,15 +60,25 @@ def check_scratch_cnn():
     assert all(p.requires_grad for p in encoder.parameters())
 
     cfg = cnn_cfg()
+    assert cfg["lr"] == 3e-4
+    assert cfg["weight_decay"] == 1e-7
+    assert cfg["dropout"] == 0.5
     model = build_cnn_model(2, cfg, 1)
     dummy_forward(model)
     assert all(p.requires_grad for p in model.parameters())
     counts = training.parameter_counts(model)
     assert counts["total"] == counts["trainable"]
     assert counts["frozen"] == 0
+    groups = training.optimizer_parameter_groups(model, cfg)
+    assert len(groups) == 1
+    assert groups[0]["lr"] == 3e-4
+    assert groups[0]["weight_decay"] == 1e-7
+    assert {id(p) for p in groups[0]["params"]} == {id(p) for p in model.parameters() if p.requires_grad}
     meta = training.model_metadata(model, cfg)
     assert meta["model"] == "cnn"
     assert meta["experiment"] == "cnn"
+    assert meta["lr"] == 3e-4
+    assert "lr_head" not in meta
     assert meta["high_encoder_feature_dim"] == 256
     assert meta["trainable_high_encoder_parameters"] == sum(p.numel() for p in model.backbone.parameters())
 
@@ -346,6 +356,7 @@ def main():
         assert rule == "median_cv_best_epoch_ceil"
 
     model_cfg = resnet_cfg("frozen")
+    assert model_cfg["dropout"] == 0.8
     model = build_resnet_model(2, model_cfg, 1)
     assert all(not p.requires_grad for p in model.backbone.parameters())
     model.train()
@@ -362,10 +373,12 @@ def main():
     frozen_groups = training.optimizer_parameter_groups(model, model_cfg)
     assert len(frozen_groups) == 1
     assert frozen_groups[0]["lr"] == model_cfg["lr_head"]
+    assert frozen_groups[0]["weight_decay"] == model_cfg["wd_head"]
     assert training.model_metadata(model, model_cfg)["experiment"] == "resnet_frozen"
     dummy_forward(model)
 
     layer4_cfg = resnet_cfg("layer4")
+    assert layer4_cfg["dropout"] == 0.8
     layer4_model = build_resnet_model(2, layer4_cfg, 1)
     for name, p in layer4_model.backbone.named_parameters():
         if not name.startswith("layer4."):
@@ -377,6 +390,7 @@ def main():
     assert any(p.requires_grad for n, p in layer4_model.named_parameters() if not n.startswith("backbone."))
     groups = training.optimizer_parameter_groups(layer4_model, layer4_cfg)
     assert [g["lr"] for g in groups] == [layer4_cfg["lr_head"], layer4_cfg["lr_layer4"]]
+    assert [g["weight_decay"] for g in groups] == [layer4_cfg["wd_head"], layer4_cfg["wd_head"]]
     grouped = [p for g in groups for p in g["params"]]
     assert len(grouped) == len({id(p) for p in grouped})
     assert {id(p) for p in grouped} == {id(p) for p in layer4_model.parameters() if p.requires_grad}
