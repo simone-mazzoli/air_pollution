@@ -322,6 +322,9 @@ Each CV epoch also prints a compact timing line for the training pass, average
 training batch time, train-subset evaluation, validation evaluation with the
 current TTA setting, and total epoch time. This is only logging; it is there to
 help diagnose runtime bottlenecks without changing the model or experiment.
+The training pass also prints a short detail line for DataLoader waiting,
+CPU-to-device transfer, forward/loss calculation, backward pass, and optimizer
+work so slow epochs can be traced more precisely.
 
 Metrics:
 

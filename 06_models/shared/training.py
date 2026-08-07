@@ -20,6 +20,10 @@ def sync_if_cuda():
         torch.cuda.synchronize()
 
 
+def elapsed(start):
+    return time.perf_counter() - start
+
+
 def parameter_counts(model):
     total = sum(p.numel() for p in model.parameters())
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -132,14 +136,40 @@ def train_one_fold(train_df, val_df, streams, cfg, build_model):
         model.train()
         tot = 0.0
         train_start = time.perf_counter()
-        for xh, xl, xs_patch, xw, xd, xs_mean, y, m in tr:
+        train_detail = {k: 0.0 for k in ("data_wait", "to_device", "forward", "backward", "optimizer")}
+        train_iter = iter(tr)
+        for _ in range(len(tr)):
+            start = time.perf_counter()
+            xh, xl, xs_patch, xw, xd, xs_mean, y, m = next(train_iter)
+            train_detail["data_wait"] += elapsed(start)
+
+            sync_if_cuda()
+            start = time.perf_counter()
             xh, xl, xs_patch, xw, xd, xs_mean, y, m = (
                 xh.to(DEVICE), xl.to(DEVICE), xs_patch.to(DEVICE), xw.to(DEVICE),
                 xd.to(DEVICE), xs_mean.to(DEVICE), y.to(DEVICE), m.to(DEVICE))
+            sync_if_cuda()
+            train_detail["to_device"] += elapsed(start)
+
+            start = time.perf_counter()
             opt.zero_grad()
+            sync_if_cuda()
+            train_detail["optimizer"] += elapsed(start)
+
+            start = time.perf_counter()
             loss = masked_loss(model(xh, xl, xs_patch, xw, xd, xs_mean), y, m, lossf)
+            sync_if_cuda()
+            train_detail["forward"] += elapsed(start)
+
+            start = time.perf_counter()
             loss.backward()
+            sync_if_cuda()
+            train_detail["backward"] += elapsed(start)
+
+            start = time.perf_counter()
             opt.step()
+            sync_if_cuda()
+            train_detail["optimizer"] += elapsed(start)
             tot += loss.item() * len(xh)
         sync_if_cuda()
         train_seconds = time.perf_counter() - train_start
@@ -169,6 +199,12 @@ def train_one_fold(train_df, val_df, streams, cfg, build_model):
               f"train_batch_avg={train_seconds / len(tr):.2f}s "
               f"train_eval={train_eval_seconds:.1f}s "
               f"val={val_seconds:.1f}s total={total_seconds:.1f}s")
+        print("       train detail: " + " ".join(
+            f"{k}={v:.1f}s/{v / len(tr):.2f}s"
+            for k, v in train_detail.items()))
+        stats = data.patch_cache_stats(cfg.get("cache_patches", CACHE_PATCHES))
+        if stats["enabled"]:
+            print(f"       patch cache: items={stats['items']} hits={stats['hits']} misses={stats['misses']}")
         if bad >= cfg["patience"]:
             print("  early stop")
             break
