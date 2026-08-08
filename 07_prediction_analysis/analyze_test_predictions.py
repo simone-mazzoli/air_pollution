@@ -43,9 +43,10 @@ BOUNDARY_SOURCES = {
     "german_states": {
         "path": STATE_BOUNDARIES,
         "label": "geoBoundaries Open DEU ADM1",
-        "url": "https://raw.githubusercontent.com/wmgeolab/geoBoundaries/main/releaseData/gbOpen/DEU/ADM1/geoBoundaries-DEU-ADM1.geojson",
+        "url": "https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/main/releaseData/gbOpen/DEU/ADM1/geoBoundaries-DEU-ADM1.geojson",
     },
 }
+LFS_POINTER_PREFIX = "version https://git-lfs.github.com/spec/v1"
 MAP_FIGURE_NAMES = {
     "test_observed_predicted_maps.png",
     "test_observed_map.png",
@@ -108,22 +109,104 @@ def project_lonlat(lon, lat):
     return x, y
 
 
+def path_for_display(path):
+    try:
+        return path.relative_to(ROOT)
+    except ValueError:
+        return path
+
+
+def validate_boundary_file(path):
+    if not path.exists():
+        return False, "missing", 0
+    size = path.stat().st_size
+    if size == 0:
+        return False, "empty file", size
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        return False, f"not UTF-8 JSON: {exc}", size
+    if text.lstrip().startswith(LFS_POINTER_PREFIX):
+        return False, "Git LFS pointer, not GeoJSON", size
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        return False, f"malformed JSON: {exc}", size
+    if data.get("type") != "FeatureCollection":
+        return False, "GeoJSON root is not a FeatureCollection", size
+    features = data.get("features")
+    if not isinstance(features, list) or not features:
+        return False, "FeatureCollection has no features", size
+    return True, f"valid FeatureCollection with {len(features)} features", size
+
+
+def download_boundary_file(source, *, verbose=False):
+    path = source["path"]
+    if verbose:
+        print(source["label"])
+        print(f"  url: {source['url']}")
+        print(f"  destination: {path_for_display(path)}")
+    valid, message, size = validate_boundary_file(path)
+    if valid:
+        if verbose:
+            print("  download attempted: no")
+            print(f"  validation: {message}")
+            print(f"  final file size: {size} bytes")
+        return True
+    if path.exists():
+        print(f"warning: invalid cached boundary file {path_for_display(path)}: {message}")
+        path.unlink()
+
+    BOUNDARIES.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    if tmp.exists():
+        tmp.unlink()
+    if verbose:
+        print("  download attempted: yes")
+    try:
+        with urllib.request.urlopen(source["url"], timeout=60) as response:
+            tmp.write_bytes(response.read())
+    except Exception as exc:
+        if tmp.exists():
+            tmp.unlink()
+        print(f"warning: could not download {source['label']}: {exc}")
+        if verbose:
+            print("  validation: download failed")
+            print("  final file size: 0 bytes")
+        return False
+
+    tmp_valid, tmp_message, tmp_size = validate_boundary_file(tmp)
+    if not tmp_valid:
+        tmp.unlink()
+        print(f"warning: downloaded {source['label']} was rejected: {tmp_message}")
+        if verbose:
+            print(f"  validation: {tmp_message}")
+            print("  final file size: 0 bytes")
+        return False
+    tmp.replace(path)
+    final_size = path.stat().st_size
+    if verbose:
+        print(f"  validation: {tmp_message}")
+        print(f"  final file size: {final_size} bytes")
+    return True
+
+
+def ensure_boundary_file(source, *, download_missing):
+    valid, message, _ = validate_boundary_file(source["path"])
+    if valid:
+        return True
+    if source["path"].exists():
+        print(f"warning: invalid cached boundary file {path_for_display(source['path'])}: {message}")
+        source["path"].unlink()
+    if not download_missing:
+        return False
+    return download_boundary_file(source)
+
+
 def download_boundary_files():
     BOUNDARIES.mkdir(parents=True, exist_ok=True)
     for source in BOUNDARY_SOURCES.values():
-        path = source["path"]
-        if path.exists():
-            continue
-        print(f"downloading boundary data once: {source['label']}")
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        try:
-            with urllib.request.urlopen(source["url"], timeout=60) as response:
-                tmp.write_bytes(response.read())
-            tmp.replace(path)
-        except Exception as exc:
-            if tmp.exists():
-                tmp.unlink()
-            print(f"warning: could not download {source['label']}: {exc}")
+        download_boundary_file(source, verbose=True)
 
 
 def geometry_rings(geometry):
@@ -152,7 +235,9 @@ def ring_overlaps_bbox(ring, bbox):
 
 
 def geojson_segments(path, bbox):
-    if not path.exists():
+    valid, message, _ = validate_boundary_file(path)
+    if not valid:
+        print(f"warning: boundary file {path_for_display(path)} is not usable: {message}")
         return []
     data = json.loads(path.read_text())
     segments = []
@@ -178,11 +263,13 @@ def lonlat_bbox(geo):
 
 
 def load_map_context(geo, *, download_missing=True):
-    if download_missing and (not COUNTRY_BOUNDARIES.exists() or not STATE_BOUNDARIES.exists()):
-        download_boundary_files()
+    available = {
+        key: ensure_boundary_file(source, download_missing=download_missing)
+        for key, source in BOUNDARY_SOURCES.items()
+    }
     bbox = lonlat_bbox(geo)
-    countries = geojson_segments(COUNTRY_BOUNDARIES, bbox)
-    states = geojson_segments(STATE_BOUNDARIES, bbox)
+    countries = geojson_segments(COUNTRY_BOUNDARIES, bbox) if available["countries"] else []
+    states = geojson_segments(STATE_BOUNDARIES, bbox) if available["german_states"] else []
     if not countries and not states:
         print("warning: no boundary GeoJSON files available; station maps will not include geographic boundaries")
     else:
@@ -206,11 +293,7 @@ def remove_stale_map_figures(reason):
     if removed:
         print("removed stale map figures:")
         for path in removed:
-            try:
-                display_path = path.relative_to(ROOT)
-            except ValueError:
-                display_path = path
-            print(f"  {display_path}")
+            print(f"  {path_for_display(path)}")
 
 
 def load_training_mean_baseline():
@@ -623,6 +706,8 @@ def run_analysis(predictions=PREDICTIONS, *, download_missing_boundaries=True):
 
 
 def self_check():
+    import contextlib
+    import io
     import tempfile
 
     df = pd.DataFrame({
@@ -647,6 +732,37 @@ def self_check():
     assert math.isclose(row["fraction_overpredicted"], 2 / 3)
     assert math.isclose(row["fraction_underpredicted"], 1 / 3)
 
+    valid_geojson = {
+        "type": "FeatureCollection",
+        "features": [{
+            "type": "Feature",
+            "properties": {},
+            "geometry": {"type": "Polygon", "coordinates": [[
+                [9.0, 51.0], [15.0, 51.0], [15.0, 55.0], [9.0, 55.0], [9.0, 51.0],
+            ]]},
+        }],
+    }
+    with tempfile.TemporaryDirectory() as td:
+        boundary_dir = Path(td)
+        cases = {
+            "empty.geojson": "",
+            "malformed.geojson": "{not json",
+            "lfs.geojson": f"{LFS_POINTER_PREFIX}\noid sha256:abc\nsize 123\n",
+        }
+        for name, text in cases.items():
+            path = boundary_dir / name
+            path.write_text(text, encoding="utf-8")
+            assert not validate_boundary_file(path)[0]
+            with contextlib.redirect_stdout(io.StringIO()):
+                assert not ensure_boundary_file({"path": path, "label": name, "url": "unused"}, download_missing=False)
+            assert not path.exists()
+        valid_path = boundary_dir / "valid.geojson"
+        valid_path.write_text(json.dumps(valid_geojson), encoding="utf-8")
+        ok, message, size = validate_boundary_file(valid_path)
+        assert ok
+        assert "valid FeatureCollection" in message
+        assert size > 0
+
     ring_lon = np.array([9.0, 15.0, 15.0, 9.0, 9.0])
     ring_lat = np.array([51.0, 51.0, 55.0, 55.0, 51.0])
     x, y = project_lonlat(ring_lon, ring_lat)
@@ -666,8 +782,9 @@ def self_check():
             }
             stale = FIGURES / "test_observed_map.png"
             assert stale.exists()
-            assert save_maps(clean, found, map_context={"countries": [], "states": []},
-                             download_missing_boundaries=False) == []
+            with contextlib.redirect_stdout(io.StringIO()):
+                assert save_maps(clean, found, map_context={"countries": [], "states": []},
+                                 download_missing_boundaries=False) == []
             assert not stale.exists()
         finally:
             FIGURES = old_figures

@@ -31,9 +31,14 @@ python3 07_prediction_analysis/analyze_test_predictions.py --download-boundaries
 
 The cached files live in `07_prediction_analysis/boundaries/`. Country outlines
 come from Natural Earth 1:50m Admin 0 Countries. German Bundesland boundaries
-come from geoBoundaries Open DEU ADM1. The plotting code reads those GeoJSON
-files directly with the Python standard library and matplotlib, so the server
-does not need a GIS stack such as cartopy or geopandas.
+come from geoBoundaries Open DEU ADM1 and are fetched through GitHub's media
+endpoint because that repository stores the GeoJSON through Git LFS. The script
+validates cached boundary files before using them, including rejecting Git LFS
+pointer files.
+
+The plotting code reads those GeoJSON files directly with the Python standard
+library and matplotlib, so the server does not need a GIS stack such as cartopy
+or geopandas. The boundary files are optional for the statistical analysis.
 If those boundary files are unavailable, the script skips the geographic map
 figures instead of writing plain longitude/latitude scatterplots.
 
