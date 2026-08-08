@@ -405,6 +405,12 @@ def main():
     with TemporaryDirectory() as td:
         cv_path = Path(td) / "cv.json"
         cv_path.write_text('{"fold1_iberia": {"best_epoch": 3}, "fold2_france": {"best_epoch": 4}}')
+        epoch_summary = training.final_epoch_summary_from_cv(cv_path, ["fold1_iberia", "fold2_france"])
+        assert epoch_summary["fold_best_epochs"] == [("fold1_iberia", 3), ("fold2_france", 4)]
+        assert epoch_summary["best_epochs"] == [3, 4]
+        assert epoch_summary["median_best_epoch"] == 3.5
+        assert epoch_summary["final_epochs"] == 4
+        assert epoch_summary["epoch_selection_rule"] == "median_cv_best_epoch_ceil"
         epochs, best_epochs, rule = training.final_epochs_from_cv(cv_path, ["fold1_iberia", "fold2_france"])
         assert epochs == 4
         assert best_epochs == [3, 4]

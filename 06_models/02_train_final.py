@@ -10,6 +10,22 @@ from shared.config import CACHE_PATCHES, DEVICE, MODEL, SEED, result_paths, trai
 from shared.models import SUPPORTED_EXPERIMENTS, require_single_experiment, selected_model
 
 
+def print_final_training_setup(epoch_summary, buffer_km, n_before_buffer, buffer_removed, loader_info):
+    print("\nFinal training setup")
+    print("--------------------")
+    print("CV best epochs:")
+    width = max(len(fold) for fold, _ in epoch_summary["fold_best_epochs"])
+    for fold, best_epoch in epoch_summary["fold_best_epochs"]:
+        print(f"  {fold:<{width}}: {best_epoch}")
+    print(f"\nMedian CV best epoch: {epoch_summary['median_best_epoch']:g}")
+    print("Epoch selection rule: ceil(median)")
+    print(f"Final training epochs: {epoch_summary['final_epochs']}")
+    print(f"\nDevelopment stations before TEST buffer: {n_before_buffer}")
+    print(f"Removed by {buffer_km:g} km TEST buffer: {buffer_removed}")
+    print(f"Final training stations: {loader_info['n_train_samples']}")
+    print(f"Batches per epoch: {loader_info['n_train_batches']}\n")
+
+
 def parse_args():
     choices = "{" + ",".join(SUPPORTED_EXPERIMENTS) + "}"
     ap = argparse.ArgumentParser(description="Train one selected experiment on all development folds.")
@@ -27,8 +43,11 @@ def main():
     data.seed_everything()
     build_model, model_config = selected_model(experiment_name, wide=args.wide)
     result = result_paths(model_config["experiment"])
-    final_epochs, cv_best_epochs, epoch_rule = training.final_epochs_from_cv(
+    epoch_summary = training.final_epoch_summary_from_cv(
         result["cv_results"], folds.development_fold_names())
+    final_epochs = epoch_summary["final_epochs"]
+    cv_best_epochs = epoch_summary["best_epochs"]
+    epoch_rule = epoch_summary["epoch_selection_rule"]
     cfg = training_config(model_config, epochs=final_epochs)
     streams = [f"{s}_tropomi" for s in cfg["s5p_streams"]]
 
@@ -39,8 +58,6 @@ def main():
     if cfg["buffer_km"] > 0:
         df = data.buffer_exclude(df, test_df, cfg["buffer_km"]).reset_index(drop=True)
         buffer_removed = n_before - len(df)
-        print(f"buffer {cfg['buffer_km']:g}km: dropped {buffer_removed}/{n_before} "
-              "train stations near NE-Germany")
     print(f"\ndevice: {DEVICE}  |  seed: {SEED}  |  experiment: {model_config['experiment']}  |  final model on ALL {len(df)} "
           f"CV stations, {cfg['epochs']} epochs (no held-out fold)\n")
 
@@ -48,6 +65,7 @@ def main():
     tstd = np.array([np.nanstd(np.log(df[p].values)) or 1.0 for p in cfg["pollutants"]], "float64")
     s5p_stats = data.compute_s5p_stats(df, streams, cfg)
     tr, loader_info = training.train_loader(data.EEA(df, streams, tmean, tstd, s5p_stats, cfg, augment=True), cfg)
+    print_final_training_setup(epoch_summary, cfg["buffer_km"], n_before, buffer_removed, loader_info)
     print(f"patch cache: {'enabled' if cfg.get('cache_patches', CACHE_PATCHES) else 'disabled'}")
 
     model = build_model(len(streams), cfg, len(cfg["pollutants"])).to(DEVICE)

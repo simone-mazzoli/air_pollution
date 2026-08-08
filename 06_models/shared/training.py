@@ -84,7 +84,7 @@ def train_loader(dataset, cfg):
     }
 
 
-def final_epochs_from_cv(cv_results_path, expected_folds):
+def final_epoch_summary_from_cv(cv_results_path, expected_folds):
     path = cv_results_path
     if not path.exists():
         raise SystemExit(f"ERROR: CV results not found: {path}. Run 06_models/01_train_cv.py first.")
@@ -92,10 +92,22 @@ def final_epochs_from_cv(cv_results_path, expected_folds):
     missing = [f for f in expected_folds if f not in cv or "best_epoch" not in cv[f]]
     if missing:
         raise SystemExit(f"ERROR: CV results are incomplete; missing best_epoch for: {missing}")
-    best_epochs = [int(cv[f]["best_epoch"]) for f in expected_folds]
+    fold_best_epochs = [(f, int(cv[f]["best_epoch"])) for f in expected_folds]
+    best_epochs = [epoch for _, epoch in fold_best_epochs]
     median = float(np.median(best_epochs))
     final_epochs = int(math.ceil(median))
-    return final_epochs, best_epochs, "median_cv_best_epoch_ceil"
+    return {
+        "final_epochs": final_epochs,
+        "best_epochs": best_epochs,
+        "fold_best_epochs": fold_best_epochs,
+        "median_best_epoch": median,
+        "epoch_selection_rule": "median_cv_best_epoch_ceil",
+    }
+
+
+def final_epochs_from_cv(cv_results_path, expected_folds):
+    summary = final_epoch_summary_from_cv(cv_results_path, expected_folds)
+    return summary["final_epochs"], summary["best_epochs"], summary["epoch_selection_rule"]
 
 
 def train_one_fold(train_df, val_df, streams, cfg, build_model, *, fold=None, history_path=None):
