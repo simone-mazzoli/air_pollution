@@ -13,6 +13,8 @@ def parse_args():
     choices = "{" + ",".join(SUPPORTED_EXPERIMENTS) + "}"
     ap = argparse.ArgumentParser(description="Evaluate one selected final model on the sealed TEST region.")
     ap.add_argument("--experiment", default=MODEL, metavar=choices)
+    ap.add_argument("--wide", action="store_true",
+                    help="use wider scratch-CNN channels with --experiment cnn or cnn_deep")
     return ap.parse_args()
 
 
@@ -72,8 +74,8 @@ def main():
     runtime.apply_runtime_config()
     print(runtime.runtime_summary())
     args = parse_args()
-    experiment_name = require_single_experiment(args.experiment, "Sealed TEST evaluation")
-    _, model_config = selected_model(experiment_name)
+    experiment_name = require_single_experiment(args.experiment, "Sealed TEST evaluation", wide=args.wide)
+    _, model_config = selected_model(experiment_name, wide=args.wide)
     result = result_paths(model_config["experiment"])
     checkpoint = result["final_checkpoint"]
     if not checkpoint.exists():
@@ -83,7 +85,7 @@ def main():
     cfg["pollutants"] = bundle.get("pollutants", cfg["pollutants"])
     if "baseline_concentration" not in bundle:
         raise SystemExit("ERROR: checkpoint is missing arithmetic train-mean baseline metadata. Re-run final training.")
-    build_model, _ = selected_model(experiment_name)
+    build_model, _ = selected_model(experiment_name, wide=args.wide)
     print(f"loaded {checkpoint}  |  experiment={model_config['experiment']}  |  streams={streams}  "
           f"aer_wide={cfg['use_aer_wide']} dem={cfg['use_dem']}  "
           f"pollutants={cfg['pollutants']}  tta={USE_TTA}\n")

@@ -7,9 +7,9 @@ from torch.utils.data import TensorDataset
 
 from shared import data, evaluation, experiment, folds, paths, runtime, summary, training
 from shared.config import CPU_INTEROP_THREADS, CPU_THREADS, NUM_WORKERS, result_paths
-from shared.models import DEFAULT_CV_EXPERIMENTS, SUPPORTED_EXPERIMENTS, cv_run_plan, require_single_experiment, selected_model
-from cnn.config import CNN_CONFIG, CNN_LARGE_CONFIG
-from cnn.model import ScratchHighEncoder, build_model as build_cnn_model
+from shared.models import DEFAULT_CV_EXPERIMENTS, SUMMARY_EXPERIMENTS, SUPPORTED_EXPERIMENTS, cv_run_plan, require_single_experiment, selected_model
+from cnn.config import BASE_HIGH_CHANNELS, WIDE_HIGH_CHANNELS
+from cnn.model import ScratchHighEncoder
 from resnet.config import RESNET_CONFIG
 from resnet.model import build_model as build_resnet_model
 
@@ -43,38 +43,27 @@ def dummy_forward(model):
     assert tuple(model(xh, xl, xs_patch, xw, xd, xs_mean).shape) == (2, 1)
 
 
-def cnn_cfg():
-    cfg = dict(CNN_CONFIG)
+def check_cnn_variant(experiment, wide, channels, convs_per_block):
+    build_model, cfg = selected_model(experiment, wide=wide)
     cfg.update({
         "use_aer_wide": True,
         "use_dem": True,
         "s5p_streams": ["no2", "co"],
         "pollutants": ["pm25"],
     })
-    return cfg
-
-
-def cnn_large_cfg():
-    cfg = dict(CNN_LARGE_CONFIG)
-    cfg.update({
-        "use_aer_wide": True,
-        "use_dem": True,
-        "s5p_streams": ["no2", "co"],
-        "pollutants": ["pm25"],
-    })
-    return cfg
-
-
-def check_cnn_variant(cfg, channels):
-    encoder = ScratchHighEncoder(channels)
+    encoder = ScratchHighEncoder(channels, convs_per_block)
     assert encoder.channels == channels
+    assert encoder.convs_per_block == convs_per_block
     assert tuple(encoder(torch.zeros(2, 10, 120, 120)).shape) == (2, channels[-1])
+    assert sum(isinstance(m, torch.nn.Conv2d) for m in encoder.modules()) == 4 * convs_per_block
+    assert sum(isinstance(m, torch.nn.MaxPool2d) for m in encoder.modules()) == 4
     assert all(p.requires_grad for p in encoder.parameters())
     assert cfg["lr"] == 3e-4
     assert cfg["weight_decay"] == 1e-7
     assert cfg["dropout"] == 0.5
-    model = build_cnn_model(2, cfg, 1)
+    model = build_model(2, cfg, 1)
     assert model.backbone.channels == channels
+    assert model.backbone.convs_per_block == convs_per_block
     xh = torch.zeros(2, 10, 120, 120)
     assert tuple(model.proj_h(model.backbone(xh)).shape) == (2, 64)
     dummy_forward(model)
@@ -93,23 +82,38 @@ def check_cnn_variant(cfg, channels):
     assert meta["lr"] == 3e-4
     assert "lr_head" not in meta
     assert meta["high_encoder_channels"] == channels
+    assert meta["convs_per_block"] == convs_per_block
+    assert meta["wide"] is wide
     assert meta["high_encoder_feature_dim"] == channels[-1]
     assert meta["trainable_high_encoder_parameters"] == sum(p.numel() for p in model.backbone.parameters())
     return model
 
 
 def check_scratch_cnn():
-    small = check_cnn_variant(cnn_cfg(), (32, 64, 128, 256))
-    large = check_cnn_variant(cnn_large_cfg(), (48, 96, 192, 384))
-    assert training.parameter_counts(large)["total"] > training.parameter_counts(small)["total"]
+    variants = [
+        ("cnn", False, BASE_HIGH_CHANNELS, 2, "cnn"),
+        ("cnn", True, WIDE_HIGH_CHANNELS, 2, "cnn_wide"),
+        ("cnn_deep", False, BASE_HIGH_CHANNELS, 3, "cnn_deep"),
+        ("cnn_deep", True, WIDE_HIGH_CHANNELS, 3, "cnn_deep_wide"),
+    ]
+    models = []
+    for experiment, wide, channels, convs_per_block, result_name in variants:
+        model = check_cnn_variant(experiment, wide, channels, convs_per_block)
+        assert model.experiment == result_name
+        models.append(model)
+    assert training.parameter_counts(models[1])["total"] > training.parameter_counts(models[0])["total"]
+    assert training.parameter_counts(models[2])["total"] > training.parameter_counts(models[0])["total"]
 
 
 def check_experiment_artifacts():
     assert DEFAULT_CV_EXPERIMENTS == ("cnn", "resnet_frozen", "resnet_full")
-    assert SUPPORTED_EXPERIMENTS == ("cnn", "resnet_frozen", "resnet_full", "cnn_large")
-    assert cv_run_plan("all", None) == [(name, None) for name in DEFAULT_CV_EXPERIMENTS]
+    assert SUPPORTED_EXPERIMENTS == ("cnn", "resnet_frozen", "resnet_full", "cnn_deep")
+    assert cv_run_plan("all", None) == [(name, None, False) for name in DEFAULT_CV_EXPERIMENTS]
     assert cv_run_plan("all", ["fold1_iberia"]) == [
-        (name, ["fold1_iberia"]) for name in DEFAULT_CV_EXPERIMENTS
+        (name, ["fold1_iberia"], False) for name in DEFAULT_CV_EXPERIMENTS
+    ]
+    assert cv_run_plan("cnn_deep", ["fold1_iberia"], wide=True) == [
+        ("cnn_deep", ["fold1_iberia"], True)
     ]
     for stage in ("Final training", "Sealed TEST evaluation"):
         try:
@@ -118,9 +122,16 @@ def check_experiment_artifacts():
             assert "requires one explicitly selected experiment" in str(exc)
         else:
             raise AssertionError(f"{stage} should reject --experiment all")
+    for bad_name in ("all", "resnet_full"):
+        try:
+            cv_run_plan(bad_name, None, wide=True)
+        except SystemExit:
+            pass
+        else:
+            raise AssertionError(f"{bad_name} should reject --wide")
 
-    result_dirs = [result_paths(name)["dir"] for name in SUPPORTED_EXPERIMENTS]
-    assert len(set(result_dirs)) == len(SUPPORTED_EXPERIMENTS)
+    result_dirs = [result_paths(name)["dir"] for name in SUMMARY_EXPERIMENTS]
+    assert len(set(result_dirs)) == len(SUMMARY_EXPERIMENTS)
     for name in SUPPORTED_EXPERIMENTS:
         _, cfg = selected_model(name)
         assert cfg["experiment"] == name
@@ -213,9 +224,11 @@ def check_summary_script_logic():
 
             write_fake_result("resnet_frozen")
             write_fake_result("resnet_full")
-            write_fake_result("cnn_large")
+            write_fake_result("cnn_wide")
+            write_fake_result("cnn_deep")
+            write_fake_result("cnn_deep_wide")
             complete = summary.summarize_results()
-            assert sorted(set(complete["available"])) == sorted(SUPPORTED_EXPERIMENTS)
+            assert sorted(set(complete["available"])) == sorted(SUMMARY_EXPERIMENTS)
             assert complete["missing"] == []
             assert (paths.RESULTS / "summary" / "experiment_comparison.csv").exists()
             assert (paths.RESULTS / "summary" / "fold_comparison.csv").exists()
@@ -386,7 +399,9 @@ def main():
     assert result_paths("resnet_frozen")["cv_results"] != result_paths("resnet_full")["cv_results"]
     assert result_paths("resnet_frozen")["cv_results"] != result_paths("cnn")["cv_results"]
     assert result_paths("resnet_full")["cv_results"] != result_paths("cnn")["cv_results"]
-    assert result_paths("cnn_large")["cv_results"] != result_paths("cnn")["cv_results"]
+    assert result_paths("cnn_wide")["cv_results"] != result_paths("cnn")["cv_results"]
+    assert result_paths("cnn_deep")["cv_results"] != result_paths("cnn")["cv_results"]
+    assert result_paths("cnn_deep_wide")["cv_results"] != result_paths("cnn_deep")["cv_results"]
     with TemporaryDirectory() as td:
         cv_path = Path(td) / "cv.json"
         cv_path.write_text('{"fold1_iberia": {"best_epoch": 3}, "fold2_france": {"best_epoch": 4}}')

@@ -10,8 +10,13 @@ Current experiment folders:
 resnet_frozen/
 resnet_full/
 cnn/
-cnn_large/
+cnn_wide/
+cnn_deep/
+cnn_deep_wide/
 ```
+
+`cnn_large/` may still exist as historical output from the earlier wide-CNN
+naming. The active wide result folder is now `cnn_wide/`.
 
 `resnet_layer4/` may still exist as historical output from a superseded
 development experiment. Keep it for reference; it is not part of the active

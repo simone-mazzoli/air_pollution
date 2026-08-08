@@ -5,10 +5,10 @@ import pandas as pd
 
 from . import paths
 from .config import result_paths
-from .models import SUPPORTED_EXPERIMENTS
+from .models import SUMMARY_EXPERIMENTS
 
 
-def summarize_results(experiments=SUPPORTED_EXPERIMENTS, out_dir=None):
+def summarize_results(experiments=SUMMARY_EXPERIMENTS, out_dir=None):
     out_dir = paths.RESULTS / "summary" if out_dir is None else out_dir
     rows, fold_frames, missing = [], [], []
     for name in experiments:

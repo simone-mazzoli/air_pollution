@@ -14,6 +14,8 @@ def parse_args():
     choices = "{" + ",".join(SUPPORTED_EXPERIMENTS) + "}"
     ap = argparse.ArgumentParser(description="Train one selected experiment on all development folds.")
     ap.add_argument("--experiment", default=MODEL, metavar=choices)
+    ap.add_argument("--wide", action="store_true",
+                    help="use wider scratch-CNN channels with --experiment cnn or cnn_deep")
     return ap.parse_args()
 
 
@@ -21,9 +23,9 @@ def main():
     runtime.apply_runtime_config()
     print(runtime.runtime_summary())
     args = parse_args()
-    experiment_name = require_single_experiment(args.experiment, "Final training")
+    experiment_name = require_single_experiment(args.experiment, "Final training", wide=args.wide)
     data.seed_everything()
-    build_model, model_config = selected_model(experiment_name)
+    build_model, model_config = selected_model(experiment_name, wide=args.wide)
     result = result_paths(model_config["experiment"])
     final_epochs, cv_best_epochs, epoch_rule = training.final_epochs_from_cv(
         result["cv_results"], folds.development_fold_names())

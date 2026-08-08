@@ -15,14 +15,16 @@ def parse_args():
     )
     ap.add_argument("--experiment", default=MODEL, choices=CV_EXPERIMENT_CHOICES,
                     help="CV experiment to run; use 'all' to run cnn, resnet_frozen, then resnet_full")
+    ap.add_argument("--wide", action="store_true",
+                    help="use wider scratch-CNN channels with --experiment cnn or cnn_deep")
     ap.add_argument("--folds", nargs="+", default=CV_FOLDS,
                     help="optional subset of fold names to run")
     return ap.parse_args()
 
 
-def run_experiment(experiment_name, selected_folds):
+def run_experiment(experiment_name, selected_folds, wide=False):
     data.seed_everything()
-    build_model, model_config = selected_model(experiment_name)
+    build_model, model_config = selected_model(experiment_name, wide=wide)
     result = result_paths(model_config["experiment"])
     cfg = training_config(model_config, epochs=CV_EPOCHS, folds=selected_folds)
     started_at = experiment.now_utc()
@@ -124,13 +126,13 @@ def main():
     runtime.apply_runtime_config()
     print(runtime.runtime_summary())
     args = parse_args()
-    plan = cv_run_plan(args.experiment, args.folds)
-    for i, (experiment_name, selected_folds) in enumerate(plan, start=1):
+    plan = cv_run_plan(args.experiment, args.folds, wide=args.wide)
+    for i, (experiment_name, selected_folds, wide) in enumerate(plan, start=1):
         if len(plan) > 1:
             print("\n" + "=" * 60)
             print(f"EXPERIMENT {i}/{len(plan)}: {experiment_name}")
             print("=" * 60)
-        run_experiment(experiment_name, selected_folds)
+        run_experiment(experiment_name, selected_folds, wide)
 
 
 if __name__ == "__main__":

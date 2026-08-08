@@ -1,7 +1,12 @@
+BASE_HIGH_CHANNELS = (32, 64, 128, 256)
+WIDE_HIGH_CHANNELS = (48, 96, 192, 384)
+
 CNN_CONFIG = {
     "model": "cnn",
     "experiment": "cnn",
-    "high_channels": (32, 64, 128, 256), # High-resolution encoder widths, one value per block.
+    "wide": False,
+    "high_channels": BASE_HIGH_CHANNELS, # High-resolution encoder widths, one value per block.
+    "convs_per_block": 2,  # Number of Conv-BN-ReLU layers before each MaxPool in the high-res encoder.
     "lr": 3e-4,             # Learning rate for the single AdamW group containing all CNN parameters.
     "weight_decay": 1e-7,   # AdamW weight decay for that same single CNN parameter group.
     "proj_dim": 64,         # Size of the high-resolution image vector after projection before fusion.
@@ -14,8 +19,8 @@ CNN_CONFIG = {
     "dem_feat": 32,         # Number of learned features from the DEM elevation patch.
 }
 
-CNN_LARGE_CONFIG = {
+CNN_DEEP_CONFIG = {
     **CNN_CONFIG,
-    "experiment": "cnn_large",
-    "high_channels": (48, 96, 192, 384),
+    "experiment": "cnn_deep",
+    "convs_per_block": 3,
 }

@@ -48,7 +48,7 @@ AdaptiveAvgPool2d(1)
 Flatten
 ```
 
-`cnn_large` uses the exact same four-block structure, but with wider channels:
+`cnn --wide` uses the exact same four-block structure, but with wider channels:
 
 ```text
 Block 1: 10 -> 48
@@ -57,11 +57,16 @@ Block 3: 96 -> 192
 Block 4: 192 -> 384
 ```
 
+`cnn_deep` keeps the original widths but uses three Conv-BN-ReLU layers in each
+block, for 12 high-resolution convolution layers total. `cnn_deep --wide`
+combines that deeper block structure with the wider channels above. All variants
+keep four MaxPool operations and the final `AdaptiveAvgPool2d(1)`.
+
 Output:
 
 ```text
 256-dimensional high-resolution feature vector for `cnn`
-384-dimensional high-resolution feature vector for `cnn_large`
+384-dimensional high-resolution feature vector for `cnn --wide`
 ```
 
 That vector is passed through the same high-resolution projection used by the
@@ -80,7 +85,7 @@ The rest of the multimodal model is shared with the ResNet experiments:
 ## Current Optimization Settings
 
 All trainable CNN parameters are currently optimized together in one AdamW
-parameter group for both `cnn` and `cnn_large`:
+parameter group for `cnn`, `cnn --wide`, `cnn_deep`, and `cnn_deep --wide`:
 
 ```text
 lr            3e-4
