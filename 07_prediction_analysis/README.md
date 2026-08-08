@@ -22,6 +22,21 @@ Run it after the final sealed TEST prediction file exists:
 python3 07_prediction_analysis/analyze_test_predictions.py
 ```
 
+The map figures use cached vector GeoJSON boundaries, not web map tiles. The
+script can cache them once with:
+
+```bash
+python3 07_prediction_analysis/analyze_test_predictions.py --download-boundaries
+```
+
+The cached files live in `07_prediction_analysis/boundaries/`. Country outlines
+come from Natural Earth 1:50m Admin 0 Countries. German Bundesland boundaries
+come from geoBoundaries Open DEU ADM1. The plotting code reads those GeoJSON
+files directly with the Python standard library and matplotlib, so the server
+does not need a GIS stack such as cartopy or geopandas.
+If those boundary files are unavailable, the script skips the geographic map
+figures instead of writing plain longitude/latitude scatterplots.
+
 The predictions and targets are station-level annual PM2.5 concentrations in
 µg/m³ for the sealed north/east German TEST region. These are not dense map
 predictions.
