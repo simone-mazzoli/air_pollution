@@ -1,3 +1,4 @@
+import importlib.util
 import pandas as pd
 import numpy as np
 import torch
@@ -236,6 +237,15 @@ def check_summary_script_logic():
             paths.RESULTS = old_results
 
 
+def check_prediction_analysis_script():
+    script = Path(__file__).resolve().parents[1] / "07_prediction_analysis" / "analyze_test_predictions.py"
+    assert script.exists()
+    spec = importlib.util.spec_from_file_location("prediction_analysis", script)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.self_check()
+
+
 def check_patch_cache():
     with TemporaryDirectory() as td:
         patch_dir = Path(td) / "high"
@@ -347,6 +357,7 @@ def main():
     assert folds.development_fold_names(sf) == ["fold1_iberia", "fold2_france"]
     check_experiment_artifacts()
     check_summary_script_logic()
+    check_prediction_analysis_script()
     check_patch_cache()
     check_configured_pollutant_filtering()
     check_joint_target_masks()
