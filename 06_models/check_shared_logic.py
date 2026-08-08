@@ -84,7 +84,7 @@ def check_scratch_cnn():
 
 
 def check_experiment_artifacts():
-    assert SUPPORTED_EXPERIMENTS == ("cnn", "resnet_frozen", "resnet_layer4")
+    assert SUPPORTED_EXPERIMENTS == ("cnn", "resnet_frozen", "resnet_full")
     assert cv_run_plan("all", None) == [(name, None) for name in SUPPORTED_EXPERIMENTS]
     assert cv_run_plan("all", ["fold1_iberia"]) == [
         (name, ["fold1_iberia"]) for name in SUPPORTED_EXPERIMENTS
@@ -190,7 +190,7 @@ def check_summary_script_logic():
             assert len(partial["comparison"]) == 1
 
             write_fake_result("resnet_frozen")
-            write_fake_result("resnet_layer4")
+            write_fake_result("resnet_full")
             complete = summary.summarize_results()
             assert sorted(set(complete["available"])) == sorted(SUPPORTED_EXPERIMENTS)
             assert complete["missing"] == []
@@ -360,8 +360,9 @@ def main():
     assert preds.loc[0, "station_code"] == "a"
     assert preds.loc[0, "land"] == "Berlin"
 
-    assert result_paths("resnet_frozen")["cv_results"] != result_paths("resnet_layer4")["cv_results"]
+    assert result_paths("resnet_frozen")["cv_results"] != result_paths("resnet_full")["cv_results"]
     assert result_paths("resnet_frozen")["cv_results"] != result_paths("cnn")["cv_results"]
+    assert result_paths("resnet_full")["cv_results"] != result_paths("cnn")["cv_results"]
     with TemporaryDirectory() as td:
         cv_path = Path(td) / "cv.json"
         cv_path.write_text('{"fold1_iberia": {"best_epoch": 3}, "fold2_france": {"best_epoch": 4}}')
@@ -392,31 +393,36 @@ def main():
     assert training.model_metadata(model, model_cfg)["experiment"] == "resnet_frozen"
     dummy_forward(model)
 
-    layer4_cfg = resnet_cfg("layer4")
-    assert layer4_cfg["dropout"] == 0.8
-    layer4_model = build_resnet_model(2, layer4_cfg, 1)
-    for name, p in layer4_model.backbone.named_parameters():
-        if not name.startswith("layer4."):
-            assert not p.requires_grad
-    assert any(p.requires_grad for p in layer4_model.backbone.layer4.parameters())
-    assert all(not p.requires_grad for bn in backbone_bn_modules(layer4_model) for p in bn.parameters())
-    layer4_model.train()
-    assert all(not bn.training for bn in backbone_bn_modules(layer4_model))
-    assert any(p.requires_grad for n, p in layer4_model.named_parameters() if not n.startswith("backbone."))
-    groups = training.optimizer_parameter_groups(layer4_model, layer4_cfg)
-    assert [g["lr"] for g in groups] == [layer4_cfg["lr_head"], layer4_cfg["lr_layer4"]]
-    assert [g["weight_decay"] for g in groups] == [layer4_cfg["wd_head"], layer4_cfg["wd_head"]]
+    full_cfg = resnet_cfg("full")
+    assert full_cfg["dropout"] == 0.8
+    full_model = build_resnet_model(2, full_cfg, 1)
+    full_counts = training.parameter_counts(full_model)
+    assert full_counts == {"total": 23766049, "trainable": 23712929, "frozen": 53120}
+    bn_param_ids = {id(p) for bn in backbone_bn_modules(full_model) for p in bn.parameters()}
+    assert any(p.requires_grad for name, p in full_model.backbone.named_parameters()
+               if id(p) not in bn_param_ids)
+    assert all(not p.requires_grad for bn in backbone_bn_modules(full_model) for p in bn.parameters())
+    full_model.train()
+    assert all(not bn.training for bn in backbone_bn_modules(full_model))
+    assert any(p.requires_grad for n, p in full_model.named_parameters() if not n.startswith("backbone."))
+    groups = training.optimizer_parameter_groups(full_model, full_cfg)
+    assert len(groups) == 2
+    assert [g["lr"] for g in groups] == [full_cfg["lr_head"], full_cfg["lr_backbone"]]
+    assert [g["weight_decay"] for g in groups] == [full_cfg["wd_head"], full_cfg["wd_head"]]
     grouped = [p for g in groups for p in g["params"]]
     assert len(grouped) == len({id(p) for p in grouped})
-    assert {id(p) for p in grouped} == {id(p) for p in layer4_model.parameters() if p.requires_grad}
-    layer4_ids = {id(p) for p in layer4_model.layer4_trainable_parameters()}
-    assert layer4_ids == {id(p) for p in groups[1]["params"]}
-    assert not any(id(p) in layer4_ids for p in groups[0]["params"])
-    layer4_meta = training.model_metadata(layer4_model, layer4_cfg)
-    assert layer4_meta["experiment"] == "resnet_layer4"
-    assert layer4_meta["backbone_mode"] == "layer4"
-    assert layer4_meta["trainable_layer4_parameters"] == sum(p.numel() for p in groups[1]["params"])
-    dummy_forward(layer4_model)
+    assert {id(p) for p in grouped} == {id(p) for p in full_model.parameters() if p.requires_grad}
+    backbone_ids = {id(p) for p in full_model.backbone_trainable_parameters()}
+    assert backbone_ids == {id(p) for p in groups[1]["params"]}
+    assert not any(id(p) in backbone_ids for p in groups[0]["params"])
+    full_meta = training.model_metadata(full_model, full_cfg)
+    assert full_meta["experiment"] == "resnet_full"
+    assert full_meta["backbone_mode"] == "full"
+    assert full_meta["lr_backbone"] == 3e-6
+    assert full_meta["trainable_backbone_parameters"] == sum(p.numel() for p in groups[1]["params"])
+    assert full_meta["trainable_backbone_parameters"] == 23476864
+    assert full_meta["trainable_non_backbone_parameters"] == 236065
+    dummy_forward(full_model)
     check_scratch_cnn()
 
 

@@ -113,7 +113,7 @@ The steps are:
   behave as expected in code.
 - `01_train_cv.py`: trains and validates candidate experiments on development
   folds only. `--experiment all` runs `cnn`, then `resnet_frozen`, then
-  `resnet_layer4` sequentially.
+  `resnet_full` sequentially.
 - `summarize_cv_results.py`: compares whichever CV experiment result folders
   have already been produced. It does not inspect sealed TEST results.
 - `02_train_final.py`: after one experiment has been chosen, trains a fresh
@@ -127,7 +127,7 @@ The supported experiment names are:
 ```text
 cnn
 resnet_frozen
-resnet_layer4
+resnet_full
 ```
 
 Use `--experiment` to choose which one to run:
@@ -266,29 +266,29 @@ total      23,766,049
 trainable     236,065
 ```
 
-### `resnet_layer4`
+### `resnet_full`
 
-`resnet_layer4` starts from the same pretrained ResNet50. The stem, layer1,
-layer2, and layer3 remain frozen. Non-BatchNorm parameters in layer4 are
-trainable. Pretrained BatchNorm layers stay frozen and in evaluation mode, even
-after `model.train()` is called.
+`resnet_full` starts from the same pretrained ResNet50. All non-BatchNorm
+pretrained backbone weights are trainable at a smaller learning rate. Pretrained
+BatchNorm layers stay frozen and in evaluation mode, even after `model.train()`
+is called.
 
-This is called partial fine-tuning because only the final stage of the
-pretrained image encoder is allowed to adapt to the pollution task. The new
-pollution parameters use `lr_head`, while trainable pretrained layer4
-parameters use the smaller `lr_layer4`.
+This is full-backbone fine-tuning with conservative BatchNorm handling. The new
+pollution parameters use `lr_head`, while trainable pretrained backbone
+parameters use the smaller `lr_backbone`.
 
 Current checked parameter counts:
 
 ```text
 total      23,766,049
-trainable  15,178,273
-layer4     14,942,208
+trainable  23,712,929
+backbone   23,476,864
+frozen         53,120
 ```
 
-The much larger trainable parameter count means `resnet_layer4` can adapt more
-than `resnet_frozen`, but it also has more ways to overfit. It should be judged
-using development-fold CV before any sealed TEST evaluation.
+The previous `resnet_layer4` development experiment is superseded because CV
+looked essentially identical to `resnet_frozen`. Its old result folder remains
+historical output, but it is no longer an active experiment choice.
 
 ### `cnn`
 
@@ -338,9 +338,9 @@ Training uses `SmoothL1Loss`. When more than one pollutant is configured, a mask
 lets the model ignore missing labels for the pollutant that is absent at a
 station. In single-pollutant runs, stations without that pollutant are filtered
 out before they enter the Dataset. The optimizer is `AdamW`. In frozen ResNet
-mode, all trainable parameters use `lr_head`. In layer4 mode, new pollution
-parameters use `lr_head`, and trainable pretrained layer4 parameters use
-`lr_layer4`. In CNN mode, all trainable CNN parameters currently share one
+mode, all trainable parameters use `lr_head`. In full ResNet mode, new pollution
+parameters use `lr_head`, and trainable pretrained backbone parameters use
+`lr_backbone`. In CNN mode, all trainable CNN parameters currently share one
 optimizer group using `lr` and `weight_decay`.
 
 `NUM_WORKERS` in `shared/config.py` controls how many extra worker processes
@@ -420,9 +420,12 @@ New results are separated by experiment:
 
 ```text
 results/resnet_frozen/
-results/resnet_layer4/
+results/resnet_full/
 results/cnn/
 ```
+
+`results/resnet_layer4/` may still exist as historical output from a superseded
+development experiment. It should not be overwritten or treated as active.
 
 Each experiment folder can contain:
 
@@ -506,7 +509,7 @@ It currently checks:
 - separate result paths for each experiment;
 - the CV-derived final epoch rule;
 - frozen ResNet trainability;
-- layer4 trainability;
+- full-backbone ResNet trainability;
 - pretrained BatchNorm freezing;
 - BatchNorm staying in eval mode after `model.train()`;
 - optimizer parameter groups;

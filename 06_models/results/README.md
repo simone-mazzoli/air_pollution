@@ -1,16 +1,20 @@
 # Results
 
 This folder contains generated modeling outputs. Results are separated by
-experiment so that frozen ResNet, partially fine-tuned ResNet, and scratch CNN
-runs do not overwrite each other.
+experiment so that frozen ResNet, full-backbone fine-tuned ResNet, and scratch
+CNN runs do not overwrite each other.
 
 Current experiment folders:
 
 ```text
 resnet_frozen/
-resnet_layer4/
+resnet_full/
 cnn/
 ```
+
+`resnet_layer4/` may still exist as historical output from a superseded
+development experiment. Keep it for reference; it is not part of the active
+candidate list.
 
 The older `resnet/` folder may contain earlier frozen-ResNet outputs from before
 the result paths were split by experiment. Keep it as historical output unless

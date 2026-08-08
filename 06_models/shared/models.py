@@ -1,6 +1,6 @@
 from .config import MODEL
 
-SUPPORTED_EXPERIMENTS = ("cnn", "resnet_frozen", "resnet_layer4")
+SUPPORTED_EXPERIMENTS = ("cnn", "resnet_frozen", "resnet_full")
 CV_EXPERIMENT_CHOICES = (*SUPPORTED_EXPERIMENTS, "all")
 
 
@@ -37,7 +37,7 @@ def _resnet_config(mode):
 def selected_model(name=MODEL):
     if name == "resnet":
         name = "resnet_frozen"
-    if name in ("resnet_frozen", "resnet_layer4"):
+    if name in ("resnet_frozen", "resnet_full"):
         from resnet.model import build_model
 
         return build_model, _resnet_config(name.removeprefix("resnet_"))

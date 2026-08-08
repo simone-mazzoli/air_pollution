@@ -14,7 +14,7 @@ def parse_args():
         description="Cross-validate one experiment, or all CV candidate experiments sequentially."
     )
     ap.add_argument("--experiment", default=MODEL, choices=CV_EXPERIMENT_CHOICES,
-                    help="CV experiment to run; use 'all' to run cnn, resnet_frozen, then resnet_layer4")
+                    help="CV experiment to run; use 'all' to run cnn, resnet_frozen, then resnet_full")
     ap.add_argument("--folds", nargs="+", default=CV_FOLDS,
                     help="optional subset of fold names to run")
     return ap.parse_args()

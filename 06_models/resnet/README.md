@@ -30,14 +30,14 @@ Change the ResNet mode with:
 
 ```python
 BACKBONE_MODE = "frozen"
-BACKBONE_MODE = "layer4"
+BACKBONE_MODE = "full"
 ```
 
 `RESNET_CONFIG["experiment"]` is built from this mode:
 
 ```text
 frozen -> resnet_frozen
-layer4 -> resnet_layer4
+full   -> resnet_full
 ```
 
 That experiment name decides which result folder is used.
@@ -63,30 +63,32 @@ trainable     236,065
 frozen     23,529,984
 ```
 
-## `resnet_layer4`
+## `resnet_full`
 
-In layer4 mode:
+In full mode:
 
-- the ResNet stem, layer1, layer2, and layer3 are frozen;
-- non-BatchNorm parameters in ResNet layer4 are trainable;
+- all non-BatchNorm pretrained ResNet backbone weights are trainable;
 - pretrained BatchNorm affine parameters stay frozen;
 - pretrained BatchNorm running statistics stay in evaluation mode;
 - the pollution-specific branches and regression head remain trainable.
 
-This is partial fine-tuning because only the last stage of the pretrained
-backbone can adapt to the PM2.5 task.
+This is full-backbone fine-tuning with conservative BatchNorm handling. The
+pretrained image features can adapt, but BatchNorm statistics are not updated
+from the small station dataset.
 
 Checked parameter counts:
 
 ```text
 total                       23,766,049
-trainable                   15,178,273
-trainable layer4            14,942,208
-trainable non-layer4           236,065
+trainable                   23,712,929
+trainable backbone          23,476,864
+trainable non-backbone         236,065
+frozen                          53,120
 ```
 
-The large increase in trainable parameters is why this mode may adapt better but
-also has more overfitting risk.
+The previous `resnet_layer4` development experiment is superseded because CV
+looked essentially identical to `resnet_frozen`. Its old result folder is kept
+as historical output, but it is no longer an active experiment choice.
 
 ## BatchNorm Behavior
 
@@ -107,13 +109,13 @@ parameters:
 lr_head
 ```
 
-Layer4 mode uses two optimizer groups:
+Full mode uses two optimizer groups:
 
 ```text
-lr_head    -> new pollution-specific parameters
-lr_layer4  -> trainable pretrained layer4 parameters
+lr_head      -> new pollution-specific parameters
+lr_backbone  -> trainable non-BatchNorm pretrained backbone parameters
 ```
 
-`lr_layer4` is intentionally smaller because pretrained weights are usually
+`lr_backbone` is intentionally smaller because pretrained weights are usually
 updated more cautiously than newly initialized pollution heads. It should be
 selected with development-fold CV, not with the sealed TEST set.

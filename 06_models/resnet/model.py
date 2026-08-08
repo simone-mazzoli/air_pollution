@@ -2,7 +2,7 @@ import torch.nn as nn
 
 from shared import multimodal
 
-SUPPORTED_BACKBONE_MODES = {"frozen", "layer4"}
+SUPPORTED_BACKBONE_MODES = {"frozen", "full"}
 
 
 class Net(nn.Module):
@@ -13,7 +13,7 @@ class Net(nn.Module):
         self.use_wide, self.use_dem = cfg["use_aer_wide"], cfg["use_dem"]
         self.backbone_mode = cfg.get("backbone_mode", "frozen")
         self.lr_head = cfg["lr_head"]
-        self.lr_layer4 = cfg.get("lr_layer4")
+        self.lr_backbone = cfg.get("lr_backbone")
         if self.backbone_mode not in SUPPORTED_BACKBONE_MODES:
             raise ValueError(f"unsupported ResNet backbone_mode: {self.backbone_mode}")
         self.backbone = timm.create_model("resnet50", pretrained=False, in_chans=10, num_classes=0)
@@ -33,8 +33,8 @@ class Net(nn.Module):
     def _configure_backbone_trainability(self):
         for p in self.backbone.parameters():
             p.requires_grad = False
-        if self.backbone_mode == "layer4":
-            for p in self.backbone.layer4.parameters():
+        if self.backbone_mode == "full":
+            for p in self.backbone.parameters():
                 p.requires_grad = True
         self._set_backbone_batchnorm_eval()
 
@@ -45,31 +45,31 @@ class Net(nn.Module):
                 for p in module.parameters():
                     p.requires_grad = False
 
-    def layer4_trainable_parameters(self):
-        if self.backbone_mode != "layer4":
+    def backbone_trainable_parameters(self):
+        if self.backbone_mode != "full":
             return []
-        return [p for p in self.backbone.layer4.parameters() if p.requires_grad]
+        return [p for p in self.backbone.parameters() if p.requires_grad]
 
     def optimizer_parameter_groups(self, cfg):
-        layer4_params = self.layer4_trainable_parameters()
-        layer4_ids = {id(p) for p in layer4_params}
-        new_params = [p for p in self.parameters() if p.requires_grad and id(p) not in layer4_ids]
+        backbone_params = self.backbone_trainable_parameters()
+        backbone_ids = {id(p) for p in backbone_params}
+        new_params = [p for p in self.parameters() if p.requires_grad and id(p) not in backbone_ids]
         groups = [{"params": new_params, "lr": cfg["lr_head"], "weight_decay": cfg["wd_head"]}]
-        if layer4_params:
-            groups.append({"params": layer4_params, "lr": cfg["lr_layer4"], "weight_decay": cfg["wd_head"]})
+        if backbone_params:
+            groups.append({"params": backbone_params, "lr": cfg["lr_backbone"], "weight_decay": cfg["wd_head"]})
         return groups
 
     def parameter_metadata(self):
-        layer4_trainable = sum(p.numel() for p in self.layer4_trainable_parameters())
+        backbone_trainable = sum(p.numel() for p in self.backbone_trainable_parameters())
         total_trainable = sum(p.numel() for p in self.parameters() if p.requires_grad)
         return {
             "model": "resnet",
             "experiment": f"resnet_{self.backbone_mode}",
             "backbone_mode": self.backbone_mode,
             "lr_head": self.lr_head,
-            "lr_layer4": self.lr_layer4,
-            "trainable_layer4_parameters": layer4_trainable,
-            "trainable_non_layer4_parameters": total_trainable - layer4_trainable,
+            "lr_backbone": self.lr_backbone,
+            "trainable_backbone_parameters": backbone_trainable,
+            "trainable_non_backbone_parameters": total_trainable - backbone_trainable,
         }
 
     def _load_pretrained(self):

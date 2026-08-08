@@ -1,12 +1,12 @@
-BACKBONE_MODE = "frozen"  # "frozen" trains only new branches/head; "layer4" also fine-tunes ResNet layer4.
-LR_LAYER4 = 1e-6  # tuning value: select with development-fold CV before using TEST
+BACKBONE_MODE = "frozen"  # "frozen" fixes the backbone; "full" fine-tunes non-BN backbone weights.
+LR_BACKBONE = 3e-6  # Smaller LR for pretrained ResNet weights in full fine-tuning.
 
 RESNET_CONFIG = {
     "model": "resnet",
     "experiment": f"resnet_{BACKBONE_MODE}",
     "backbone_mode": BACKBONE_MODE,
     "lr_head": 1e-5,        # Learning rate for new pollution-specific branches and regression head.
-    "lr_layer4": LR_LAYER4, # Smaller learning rate for trainable pretrained ResNet layer4 parameters.
+    "lr_backbone": LR_BACKBONE, # Learning rate for trainable pretrained backbone parameters.
     "wd_head": 1e-7,        # AdamW weight decay used by each active ResNet optimizer group.
     "proj_dim": 64,         # Size of the high-resolution image vector after projection before fusion.
     "dropout": 0.8,         # Drop 80% of activations at shared dropout layers during training.
