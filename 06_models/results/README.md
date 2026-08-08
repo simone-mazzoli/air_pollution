@@ -10,6 +10,7 @@ Current experiment folders:
 resnet_frozen/
 resnet_full/
 cnn/
+cnn_large/
 ```
 
 `resnet_layer4/` may still exist as historical output from a superseded

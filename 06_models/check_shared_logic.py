@@ -7,8 +7,8 @@ from torch.utils.data import TensorDataset
 
 from shared import data, evaluation, experiment, folds, paths, runtime, summary, training
 from shared.config import CPU_INTEROP_THREADS, CPU_THREADS, NUM_WORKERS, result_paths
-from shared.models import SUPPORTED_EXPERIMENTS, cv_run_plan, require_single_experiment, selected_model
-from cnn.config import CNN_CONFIG
+from shared.models import DEFAULT_CV_EXPERIMENTS, SUPPORTED_EXPERIMENTS, cv_run_plan, require_single_experiment, selected_model
+from cnn.config import CNN_CONFIG, CNN_LARGE_CONFIG
 from cnn.model import ScratchHighEncoder, build_model as build_cnn_model
 from resnet.config import RESNET_CONFIG
 from resnet.model import build_model as build_resnet_model
@@ -54,16 +54,29 @@ def cnn_cfg():
     return cfg
 
 
-def check_scratch_cnn():
-    encoder = ScratchHighEncoder()
-    assert tuple(encoder(torch.zeros(2, 10, 120, 120)).shape) == (2, 256)
-    assert all(p.requires_grad for p in encoder.parameters())
+def cnn_large_cfg():
+    cfg = dict(CNN_LARGE_CONFIG)
+    cfg.update({
+        "use_aer_wide": True,
+        "use_dem": True,
+        "s5p_streams": ["no2", "co"],
+        "pollutants": ["pm25"],
+    })
+    return cfg
 
-    cfg = cnn_cfg()
+
+def check_cnn_variant(cfg, channels):
+    encoder = ScratchHighEncoder(channels)
+    assert encoder.channels == channels
+    assert tuple(encoder(torch.zeros(2, 10, 120, 120)).shape) == (2, channels[-1])
+    assert all(p.requires_grad for p in encoder.parameters())
     assert cfg["lr"] == 3e-4
     assert cfg["weight_decay"] == 1e-7
     assert cfg["dropout"] == 0.5
     model = build_cnn_model(2, cfg, 1)
+    assert model.backbone.channels == channels
+    xh = torch.zeros(2, 10, 120, 120)
+    assert tuple(model.proj_h(model.backbone(xh)).shape) == (2, 64)
     dummy_forward(model)
     assert all(p.requires_grad for p in model.parameters())
     counts = training.parameter_counts(model)
@@ -76,18 +89,27 @@ def check_scratch_cnn():
     assert {id(p) for p in groups[0]["params"]} == {id(p) for p in model.parameters() if p.requires_grad}
     meta = training.model_metadata(model, cfg)
     assert meta["model"] == "cnn"
-    assert meta["experiment"] == "cnn"
+    assert meta["experiment"] == cfg["experiment"]
     assert meta["lr"] == 3e-4
     assert "lr_head" not in meta
-    assert meta["high_encoder_feature_dim"] == 256
+    assert meta["high_encoder_channels"] == channels
+    assert meta["high_encoder_feature_dim"] == channels[-1]
     assert meta["trainable_high_encoder_parameters"] == sum(p.numel() for p in model.backbone.parameters())
+    return model
+
+
+def check_scratch_cnn():
+    small = check_cnn_variant(cnn_cfg(), (32, 64, 128, 256))
+    large = check_cnn_variant(cnn_large_cfg(), (48, 96, 192, 384))
+    assert training.parameter_counts(large)["total"] > training.parameter_counts(small)["total"]
 
 
 def check_experiment_artifacts():
-    assert SUPPORTED_EXPERIMENTS == ("cnn", "resnet_frozen", "resnet_full")
-    assert cv_run_plan("all", None) == [(name, None) for name in SUPPORTED_EXPERIMENTS]
+    assert DEFAULT_CV_EXPERIMENTS == ("cnn", "resnet_frozen", "resnet_full")
+    assert SUPPORTED_EXPERIMENTS == ("cnn", "resnet_frozen", "resnet_full", "cnn_large")
+    assert cv_run_plan("all", None) == [(name, None) for name in DEFAULT_CV_EXPERIMENTS]
     assert cv_run_plan("all", ["fold1_iberia"]) == [
-        (name, ["fold1_iberia"]) for name in SUPPORTED_EXPERIMENTS
+        (name, ["fold1_iberia"]) for name in DEFAULT_CV_EXPERIMENTS
     ]
     for stage in ("Final training", "Sealed TEST evaluation"):
         try:
@@ -191,6 +213,7 @@ def check_summary_script_logic():
 
             write_fake_result("resnet_frozen")
             write_fake_result("resnet_full")
+            write_fake_result("cnn_large")
             complete = summary.summarize_results()
             assert sorted(set(complete["available"])) == sorted(SUPPORTED_EXPERIMENTS)
             assert complete["missing"] == []
@@ -363,6 +386,7 @@ def main():
     assert result_paths("resnet_frozen")["cv_results"] != result_paths("resnet_full")["cv_results"]
     assert result_paths("resnet_frozen")["cv_results"] != result_paths("cnn")["cv_results"]
     assert result_paths("resnet_full")["cv_results"] != result_paths("cnn")["cv_results"]
+    assert result_paths("cnn_large")["cv_results"] != result_paths("cnn")["cv_results"]
     with TemporaryDirectory() as td:
         cv_path = Path(td) / "cv.json"
         cv_path.write_text('{"fold1_iberia": {"best_epoch": 3}, "fold2_france": {"best_epoch": 4}}')

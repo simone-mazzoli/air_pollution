@@ -1,12 +1,13 @@
 from .config import MODEL
 
-SUPPORTED_EXPERIMENTS = ("cnn", "resnet_frozen", "resnet_full")
+DEFAULT_CV_EXPERIMENTS = ("cnn", "resnet_frozen", "resnet_full")
+SUPPORTED_EXPERIMENTS = (*DEFAULT_CV_EXPERIMENTS, "cnn_large")
 CV_EXPERIMENT_CHOICES = (*SUPPORTED_EXPERIMENTS, "all")
 
 
 def expand_cv_experiments(name):
     if name == "all":
-        return list(SUPPORTED_EXPERIMENTS)
+        return list(DEFAULT_CV_EXPERIMENTS)
     if name in SUPPORTED_EXPERIMENTS:
         return [name]
     raise SystemExit(f"ERROR: unknown experiment {name}")
@@ -41,9 +42,9 @@ def selected_model(name=MODEL):
         from resnet.model import build_model
 
         return build_model, _resnet_config(name.removeprefix("resnet_"))
-    if name == "cnn":
-        from cnn.config import CNN_CONFIG
+    if name in ("cnn", "cnn_large"):
+        from cnn.config import CNN_CONFIG, CNN_LARGE_CONFIG
         from cnn.model import build_model
 
-        return build_model, CNN_CONFIG
+        return build_model, CNN_LARGE_CONFIG if name == "cnn_large" else CNN_CONFIG
     raise SystemExit(f"ERROR: unknown model {name}")

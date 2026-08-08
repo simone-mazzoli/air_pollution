@@ -113,7 +113,8 @@ The steps are:
   behave as expected in code.
 - `01_train_cv.py`: trains and validates candidate experiments on development
   folds only. `--experiment all` runs `cnn`, then `resnet_frozen`, then
-  `resnet_full` sequentially.
+  `resnet_full` sequentially. `cnn_large` is an opt-in capacity ablation and is
+  not included in `all`.
 - `summarize_cv_results.py`: compares whichever CV experiment result folders
   have already been produced. It does not inspect sealed TEST results.
 - `02_train_final.py`: after one experiment has been chosen, trains a fresh
@@ -128,6 +129,7 @@ The supported experiment names are:
 cnn
 resnet_frozen
 resnet_full
+cnn_large
 ```
 
 Use `--experiment` to choose which one to run:
@@ -140,6 +142,12 @@ To run all candidate CV experiments in the standard order:
 
 ```bash
 python3 06_models/01_train_cv.py --experiment all
+```
+
+To run the larger scratch-CNN ablation:
+
+```bash
+python3 06_models/01_train_cv.py --experiment cnn_large
 ```
 
 To run only a few development folds while testing code:
@@ -297,6 +305,10 @@ BigEarthNet-pretrained ResNet50. It still uses the same station assignments,
 100 km buffer, preprocessing, target transformation, metrics, and sealed TEST
 setup as the ResNet experiments.
 
+The default scratch encoder uses channel widths `32, 64, 128, 256`.
+`cnn_large` is the same four-block design widened to `48, 96, 192, 384`; all
+downstream multimodal branches and training settings stay the same.
+
 ## Shared Multimodal Architecture
 
 The ResNet model combines several inputs around each station:
@@ -422,6 +434,7 @@ New results are separated by experiment:
 results/resnet_frozen/
 results/resnet_full/
 results/cnn/
+results/cnn_large/
 ```
 
 `results/resnet_layer4/` may still exist as historical output from a superseded

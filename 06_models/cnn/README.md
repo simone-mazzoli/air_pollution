@@ -37,7 +37,7 @@ Input:
 10 x 120 x 120 Sentinel-2 patch
 ```
 
-Architecture:
+`cnn` architecture:
 
 ```text
 Block 1: 10 -> 32 channels, two 3x3 convolutions, BatchNorm, ReLU, MaxPool
@@ -48,10 +48,20 @@ AdaptiveAvgPool2d(1)
 Flatten
 ```
 
+`cnn_large` uses the exact same four-block structure, but with wider channels:
+
+```text
+Block 1: 10 -> 48
+Block 2: 48 -> 96
+Block 3: 96 -> 192
+Block 4: 192 -> 384
+```
+
 Output:
 
 ```text
-256-dimensional high-resolution feature vector
+256-dimensional high-resolution feature vector for `cnn`
+384-dimensional high-resolution feature vector for `cnn_large`
 ```
 
 That vector is passed through the same high-resolution projection used by the
@@ -70,7 +80,7 @@ The rest of the multimodal model is shared with the ResNet experiments:
 ## Current Optimization Settings
 
 All trainable CNN parameters are currently optimized together in one AdamW
-parameter group:
+parameter group for both `cnn` and `cnn_large`:
 
 ```text
 lr            3e-4

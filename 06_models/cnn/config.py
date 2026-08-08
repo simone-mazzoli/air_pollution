@@ -1,6 +1,7 @@
 CNN_CONFIG = {
     "model": "cnn",
     "experiment": "cnn",
+    "high_channels": (32, 64, 128, 256), # High-resolution encoder widths, one value per block.
     "lr": 3e-4,             # Learning rate for the single AdamW group containing all CNN parameters.
     "weight_decay": 1e-7,   # AdamW weight decay for that same single CNN parameter group.
     "proj_dim": 64,         # Size of the high-resolution image vector after projection before fusion.
@@ -11,4 +12,10 @@ CNN_CONFIG = {
     "head_hidden": 64,      # Hidden width of the final regression head after feature concatenation.
     "wide_feat": 32,        # Number of learned features from the wide aerosol-context patch.
     "dem_feat": 32,         # Number of learned features from the DEM elevation patch.
+}
+
+CNN_LARGE_CONFIG = {
+    **CNN_CONFIG,
+    "experiment": "cnn_large",
+    "high_channels": (48, 96, 192, 384),
 }
