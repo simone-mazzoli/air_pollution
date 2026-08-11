@@ -5,6 +5,14 @@ centered on a sensor or station. The model uses these patches as inputs.
 
 Run commands from the repository root.
 
+# EEA scripts summary:
+
+01_download_eea_patches.py fetches Sentinel-2 (local + wide-context multispectral) and Sentinel-5P (NO2, aerosol index, CO) satellite patches, plus a static Copernicus DEM elevation patch, for every EEA air-quality station across Europe via Earth Engine's computePixels.
+
+02_download_dense_grid_patches.py extract the same patches type across north eastern Germany, building a 10km regular grid. It therefore prodices a continuous pollution map. Imports the same fetch logic as script 01.
+
+In both scripts streams are independently selectable and resumable and each filters out corrupted patches (e.g. cloud filtering).
+
 ## Setup
 
 These scripts require Google Earth Engine access. If `client_id_GEE.txt` exists
