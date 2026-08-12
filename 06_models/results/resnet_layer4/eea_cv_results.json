@@ -1,0 +1,365 @@
+{
+  "fold1_iberia": {
+    "n_train": 1662,
+    "n_val": 204,
+    "best_epoch": 16,
+    "epochs_run": 41,
+    "best_validation_metric": 3.0329785522230184,
+    "epoch_numbering": "one_based",
+    "n_train_samples": 1662,
+    "n_train_batches": 13,
+    "effective_drop_last": false,
+    "parameter_counts": {
+      "total": 23766049,
+      "trainable": 15178273,
+      "frozen": 8587776
+    },
+    "model": "resnet",
+    "experiment": "resnet_layer4",
+    "backbone_mode": "layer4",
+    "lr_head": 1e-05,
+    "lr_layer4": 1e-06,
+    "trainable_layer4_parameters": 14942208,
+    "trainable_non_layer4_parameters": 236065,
+    "pm25": {
+      "rmse": 3.0329785522230184,
+      "mae": 2.588737597413672,
+      "r2": -0.3886211679646523,
+      "n": 204,
+      "baseline": 4.199973338549879,
+      "baseline_concentration": 11.398050627024533,
+      "baseline_metrics": {
+        "rmse": 4.199973338549879,
+        "mae": 3.6225221374762793,
+        "r2": -1.6627976873601007,
+        "n": 204
+      }
+    },
+    "buffer_km": 100.0,
+    "buffer_removed_train_stations": 3,
+    "n_train_before_buffer": 1665
+  },
+  "fold2_france": {
+    "n_train": 1392,
+    "n_val": 362,
+    "best_epoch": 14,
+    "epochs_run": 39,
+    "best_validation_metric": 3.084111145915556,
+    "epoch_numbering": "one_based",
+    "n_train_samples": 1392,
+    "n_train_batches": 11,
+    "effective_drop_last": false,
+    "parameter_counts": {
+      "total": 23766049,
+      "trainable": 15178273,
+      "frozen": 8587776
+    },
+    "model": "resnet",
+    "experiment": "resnet_layer4",
+    "backbone_mode": "layer4",
+    "lr_head": 1e-05,
+    "lr_layer4": 1e-06,
+    "trainable_layer4_parameters": 14942208,
+    "trainable_non_layer4_parameters": 236065,
+    "pm25": {
+      "rmse": 3.084111145915556,
+      "mae": 2.81780060087825,
+      "r2": -2.4745007010340916,
+      "n": 362,
+      "baseline": 4.203182751213454,
+      "baseline_concentration": 11.992663107756849,
+      "baseline_metrics": {
+        "rmse": 4.203182751213454,
+        "mae": 3.9304633430672995,
+        "r2": -5.453404835883483,
+        "n": 362
+      }
+    },
+    "buffer_km": 100.0,
+    "buffer_removed_train_stations": 115,
+    "n_train_before_buffer": 1507
+  },
+  "fold3_italy": {
+    "n_train": 1558,
+    "n_val": 286,
+    "best_epoch": 240,
+    "epochs_run": 265,
+    "best_validation_metric": 4.415776879419765,
+    "epoch_numbering": "one_based",
+    "n_train_samples": 1558,
+    "n_train_batches": 13,
+    "effective_drop_last": false,
+    "parameter_counts": {
+      "total": 23766049,
+      "trainable": 15178273,
+      "frozen": 8587776
+    },
+    "model": "resnet",
+    "experiment": "resnet_layer4",
+    "backbone_mode": "layer4",
+    "lr_head": 1e-05,
+    "lr_layer4": 1e-06,
+    "trainable_layer4_parameters": 14942208,
+    "trainable_non_layer4_parameters": 236065,
+    "pm25": {
+      "rmse": 4.415776879419765,
+      "mae": 3.326572335315381,
+      "r2": -0.06366942319193303,
+      "n": 286,
+      "baseline": 5.051499845035198,
+      "baseline_concentration": 10.630579511807708,
+      "baseline_metrics": {
+        "rmse": 5.051499845035198,
+        "mae": 3.870999700312449,
+        "r2": -0.391980401102598,
+        "n": 286
+      }
+    },
+    "buffer_km": 100.0,
+    "buffer_removed_train_stations": 25,
+    "n_train_before_buffer": 1583
+  },
+  "fold4_alpine": {
+    "n_train": 1466,
+    "n_val": 253,
+    "best_epoch": 23,
+    "epochs_run": 48,
+    "best_validation_metric": 2.1676420577400255,
+    "epoch_numbering": "one_based",
+    "n_train_samples": 1466,
+    "n_train_batches": 12,
+    "effective_drop_last": false,
+    "parameter_counts": {
+      "total": 23766049,
+      "trainable": 15178273,
+      "frozen": 8587776
+    },
+    "model": "resnet",
+    "experiment": "resnet_layer4",
+    "backbone_mode": "layer4",
+    "lr_head": 1e-05,
+    "lr_layer4": 1e-06,
+    "trainable_layer4_parameters": 14942208,
+    "trainable_non_layer4_parameters": 236065,
+    "pm25": {
+      "rmse": 2.1676420577400255,
+      "mae": 1.8513538351141112,
+      "r2": -0.47293728422688197,
+      "n": 253,
+      "baseline": 3.3768510166887133,
+      "baseline_concentration": 11.42820302489163,
+      "baseline_metrics": {
+        "rmse": 3.3768510166887133,
+        "mae": 3.001605328378887,
+        "r2": -2.574644996952032,
+        "n": 253
+      }
+    },
+    "buffer_km": 100.0,
+    "buffer_removed_train_stations": 150,
+    "n_train_before_buffer": 1616
+  },
+  "fold5_north": {
+    "n_train": 1672,
+    "n_val": 197,
+    "best_epoch": 20,
+    "epochs_run": 45,
+    "best_validation_metric": 4.268770987401658,
+    "epoch_numbering": "one_based",
+    "n_train_samples": 1672,
+    "n_train_batches": 14,
+    "effective_drop_last": false,
+    "parameter_counts": {
+      "total": 23766049,
+      "trainable": 15178273,
+      "frozen": 8587776
+    },
+    "model": "resnet",
+    "experiment": "resnet_layer4",
+    "backbone_mode": "layer4",
+    "lr_head": 1e-05,
+    "lr_layer4": 1e-06,
+    "trainable_layer4_parameters": 14942208,
+    "trainable_non_layer4_parameters": 236065,
+    "pm25": {
+      "rmse": 4.268770987401658,
+      "mae": 3.8009170213963306,
+      "r2": -3.0217078262944286,
+      "n": 197,
+      "baseline": 5.270858973639683,
+      "baseline_concentration": 11.539956415686719,
+      "baseline_metrics": {
+        "rmse": 5.270858973639683,
+        "mae": 4.867978499582019,
+        "r2": -5.131512146130206,
+        "n": 197
+      }
+    },
+    "buffer_km": 100.0,
+    "buffer_removed_train_stations": 0,
+    "n_train_before_buffer": 1672
+  },
+  "fold6_balkan_e": {
+    "n_train": 1658,
+    "n_val": 146,
+    "best_epoch": 356,
+    "epochs_run": 381,
+    "best_validation_metric": 7.756667172095148,
+    "epoch_numbering": "one_based",
+    "n_train_samples": 1658,
+    "n_train_batches": 13,
+    "effective_drop_last": false,
+    "parameter_counts": {
+      "total": 23766049,
+      "trainable": 15178273,
+      "frozen": 8587776
+    },
+    "model": "resnet",
+    "experiment": "resnet_layer4",
+    "backbone_mode": "layer4",
+    "lr_head": 1e-05,
+    "lr_layer4": 1e-06,
+    "trainable_layer4_parameters": 14942208,
+    "trainable_non_layer4_parameters": 236065,
+    "pm25": {
+      "rmse": 7.756667172095148,
+      "mae": 5.289464443678487,
+      "r2": -0.5774942905063452,
+      "n": 146,
+      "baseline": 8.296847586740398,
+      "baseline_concentration": 10.43087610847783,
+      "baseline_metrics": {
+        "rmse": 8.296847586740398,
+        "mae": 6.117667552518946,
+        "r2": -0.8048607879217817,
+        "n": 146
+      }
+    },
+    "buffer_km": 100.0,
+    "buffer_removed_train_stations": 65,
+    "n_train_before_buffer": 1723
+  },
+  "fold7_balkan_s": {
+    "n_train": 1713,
+    "n_val": 144,
+    "best_epoch": 151,
+    "epochs_run": 176,
+    "best_validation_metric": 8.864358856286191,
+    "epoch_numbering": "one_based",
+    "n_train_samples": 1713,
+    "n_train_batches": 14,
+    "effective_drop_last": false,
+    "parameter_counts": {
+      "total": 23766049,
+      "trainable": 15178273,
+      "frozen": 8587776
+    },
+    "model": "resnet",
+    "experiment": "resnet_layer4",
+    "backbone_mode": "layer4",
+    "lr_head": 1e-05,
+    "lr_layer4": 1e-06,
+    "trainable_layer4_parameters": 14942208,
+    "trainable_non_layer4_parameters": 236065,
+    "pm25": {
+      "rmse": 8.864358856286191,
+      "mae": 6.972357080640962,
+      "r2": -0.7955355341768025,
+      "n": 144,
+      "baseline": 9.399567815060905,
+      "baseline_concentration": 10.499970073433039,
+      "baseline_metrics": {
+        "rmse": 9.399567815060905,
+        "mae": 7.465852159047649,
+        "r2": -1.0189014407316908,
+        "n": 144
+      }
+    },
+    "buffer_km": 100.0,
+    "buffer_removed_train_stations": 12,
+    "n_train_before_buffer": 1725
+  },
+  "fold8_poland": {
+    "n_train": 1538,
+    "n_val": 277,
+    "best_epoch": 1,
+    "epochs_run": 26,
+    "best_validation_metric": 5.550738567159489,
+    "epoch_numbering": "one_based",
+    "n_train_samples": 1538,
+    "n_train_batches": 13,
+    "effective_drop_last": false,
+    "parameter_counts": {
+      "total": 23766049,
+      "trainable": 15178273,
+      "frozen": 8587776
+    },
+    "model": "resnet",
+    "experiment": "resnet_layer4",
+    "backbone_mode": "layer4",
+    "lr_head": 1e-05,
+    "lr_layer4": 1e-06,
+    "trainable_layer4_parameters": 14942208,
+    "trainable_non_layer4_parameters": 236065,
+    "pm25": {
+      "rmse": 5.550738567159489,
+      "mae": 4.834396158859427,
+      "r2": -2.4717922881377734,
+      "n": 277,
+      "baseline": 4.729557166067676,
+      "baseline_concentration": 10.497541566911718,
+      "baseline_metrics": {
+        "rmse": 4.729557166067676,
+        "mae": 3.9761035626180097,
+        "r2": -1.5205373861113802,
+        "n": 277
+      }
+    },
+    "buffer_km": 100.0,
+    "buffer_removed_train_stations": 54,
+    "n_train_before_buffer": 1592
+  },
+  "pooled_out_of_fold": {
+    "pm25": {
+      "rmse": 4.869017632948253,
+      "mae": 3.65549925798977,
+      "r2": 0.05460550932602937,
+      "n": 1869
+    }
+  },
+  "_config": {
+    "batch": 128,
+    "num_workers": 0,
+    "cache_patches": true,
+    "s5p_streams": [
+      "no2",
+      "co"
+    ],
+    "use_aer_wide": true,
+    "use_dem": true,
+    "tta": true,
+    "buffer_km": 100.0,
+    "max_pm10": 120.0,
+    "max_pm25": 80.0,
+    "pollutants": [
+      "pm25"
+    ],
+    "model": "resnet",
+    "experiment": "resnet_layer4",
+    "backbone_mode": "layer4",
+    "lr_head": 1e-05,
+    "lr_layer4": 1e-06,
+    "wd_head": 1e-07,
+    "proj_dim": 64,
+    "dropout": 0.8,
+    "low_cnn_ch1": 32,
+    "low_cnn_ch2": 128,
+    "s5p_cnn_hidden": 32,
+    "head_hidden": 64,
+    "wide_feat": 32,
+    "dem_feat": 32,
+    "pretrained": true,
+    "epochs": 500,
+    "patience": 25
+  }
+}
