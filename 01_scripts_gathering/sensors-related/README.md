@@ -1,7 +1,7 @@
 # Sensors-Related: Low-Cost Sensor Branch
 This is the original, chronologically first data-gathering direction: volunteer
 low-cost sensors (Sensor.Community) plus Germany-only official reference
-stations (UBA). **Not used in the final model** — low-cost sensors turned out
+stations (UBA). **Not used in the final model**. Low-cost sensors turned out
 not usable even after calibration, and Germany-only reference stations (~400)
 were too few on their own. See `../README.md` for the branch that replaced this
 one (EEA reference stations).

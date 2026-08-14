@@ -1,58 +1,38 @@
 # 02 Cleaning And Aggregation
-
 This folder turns raw downloads into tables that later scripts can use.
 Cleaning mostly means filtering impossible values, grouping readings by sensor
 and time, and writing smaller files under `data/processed/`.
-
 Run commands from the repository root.
 
-## Main Scripts
+Sensor.Community/UBA cleaning scripts live in `sensors-related/README.md`
+(low-cost branch, not used in the final model). This page covers the EEA
+label-building and socioeconomic scripts.
 
+## Main Scripts
 | Script | What it does | Main output |
 | --- | --- | --- |
-| `sensors-related/01_process_pm_sensors.py` | Cleans PM sensors, keeps Germany-bounding-box readings, and creates hourly/daily/monthly PM tables. | `data/processed/hourly/pm/`, `data/processed/daily_avg/`, `data/processed/monthly_avg/` |
-| `sensors-related/02_process_humidity_sensors.py` | Cleans humidity/weather sensors and creates hourly/daily/monthly humidity tables. | `data/processed/hourly/humidity/`, `data/processed/daily_avg/humidity/`, `data/processed/monthly_avg/humidity/` |
-| `sensors-related/03_aggregate_uba_monthly.py` | Aggregates daily UBA reference data to monthly station means. | `data/processed/monthly_avg/uba/pm_reference_stations_<YYYY-MM>.csv` |
-| `sensors-related/04_locate_DEUB_UBA_stations.py` | Assigns each UBA station to a German federal state. | `data/processed/uba/station_land.csv` |
-| `build_eea_pm_labels.py` | builds the EU-wide annual PM label file from the EEA raw parquet, one row per (station, valid day). | `data/processed/daily_avg/eea/pm_reference_stations_2024.csv` |
-
+| `01_build_eea_labels.py` | Builds the EU-wide annual PM label file from the EEA raw parquet, one row per (station, valid day). | `data/processed/daily_avg/eea/pm_reference_stations_2024.csv` |
+| `02_build_socioeconomic_kreis_2024.py` | Combines manually collected 2024 socioeconomic source files (population, median age, deaths, unemployment, wages) into a single Kreis-level table, joined on AGS. | `data/processed/socioeconomic/socioeconomic_kreis_2024.csv` |
 
 ## Usual Order
-
 ```bash
-python3 02_scripts_cleaning/sensors-related/01_process_pm_sensors.py
-python3 02_scripts_cleaning/sensors-related/02_process_humidity_sensors.py
-python3 02_scripts_cleaning/sensors-related/03_aggregate_uba_monthly.py
-python3 02_scripts_cleaning/sensors-related/04_locate_DEUB_UBA_stations.py
+python3 02_scripts_cleaning/01_build_eea_labels.py
+python3 02_scripts_cleaning/02_build_socioeconomic_kreis_2024.py
 ```
 
-For a smaller test run:
-
-```bash
-python3 02_scripts_cleaning/sensors-related/01_process_pm_sensors.py --months 2024-01 2024-02 --types sds011 --force
-python3 02_scripts_cleaning/sensors-related/02_process_humidity_sensors.py --months 2024-01 2024-02 --types bme280 dht22 --force
-```
-
-Use `--no-merge` only if you do not want the combined monthly/hourly files that
-later stages normally expect.
-
-## A Few Terms
-
-Annual aggregation means turning daily values into one value for the year.
-Hourly, daily, and monthly aggregation are the same idea at shorter time scales.
-
-For Sensor.Community SDS011 PM sensors, `P1` is treated as PM10 and `P2` as
-PM2.5.
-
-## Important Details
-
-- PM cleaning drops non-positive readings, very high values above `1000`, and
-  rows where `P2 > P1`.
-- PM and humidity cleaning both require enough readings per hour/day/month so a
-  single sparse sensor does not dominate.
-- Humidity readings are also clipped at 90% to reduce the effect of saturated
-  humidity sensors.
-- UBA station-state assignment may fetch German state boundaries if
-  `data/processed/germany_states.geojson` is missing.
+## Notes
+- `01_build_eea_labels.py` keeps a station if PM10 or PM2.5 has at least
+  `--min-frac` (default 90%) of the year's days valid, matching
+  `count_eea_stations.py`'s threshold from `01_scripts_gathering`. Only valid,
+  non-missing observations (`Validity > 0`, value not the -999 missing marker,
+  value >= 0) are kept.
+- `02_build_socioeconomic_kreis_2024.py` needs
+  `data/processed/admin_boundaries/vg250_kreis.geojson` (from
+  `01_scripts_gathering/sensors-related/04_get_admin_boundaries.py`) as the
+  AGS/NUTS crosswalk, plus the raw Eurostat/VGRdL xlsx files under
+  `data/processed/socioeconomic/`. Unemployment (Arbeitslosenquote) is
+  downloaded fresh from the Bundesagentur für Arbeit rather than read from a
+  local file. The wage column is gross wages per employee, not disposable
+  household income -- named accordingly, not a drop-in income measure.
 
 The next folder is [03_scripts_calibration](../03_scripts_calibration/README.md).
