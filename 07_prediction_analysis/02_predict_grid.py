@@ -1,6 +1,6 @@
 """
 Runs the selected trained experiment's final checkpoint over the dense grid
-(built by 04_download_grid_patches.py) and
+(built by 04_GEE/02_download_dense_grid_patches.py) and
 writes a continuous pollution-map PNG + a predictions CSV.
 Model selection matches 03_predict_test.py: pass --experiment (and possibly
 --wide.
@@ -21,8 +21,12 @@ outputs:
     grid_results/cnn_deep_wide_grid_map.png
 """
 
-import argparse
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "06_models"))
+
+import argparse
 import numpy as np
 import pandas as pd
 import torch
@@ -30,6 +34,8 @@ from torch.utils.data import DataLoader, Dataset
 from shared import data, paths, runtime
 from shared.config import BATCH_SIZE, CACHE_PATCHES, DEVICE, DISPLAY, MODEL, NUM_WORKERS, USE_TTA, result_paths
 from shared.models import SUPPORTED_EXPERIMENTS, require_single_experiment, selected_model
+
+
 GRID_SAT = paths.PROC / "satellite_grid"
 GRID_CSV = paths.PROC / "eea" / "grid_points.csv"
 GHIGH = GRID_SAT / "high_res_multispec"
