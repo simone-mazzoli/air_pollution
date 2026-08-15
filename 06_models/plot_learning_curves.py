@@ -8,10 +8,10 @@ if str(MODELS_DIR) not in sys.path:
 
 from shared import plotting
 from shared import paths
-from shared.models import FINAL_MAIN_EXPERIMENTS
+from shared.models import REPORT_EXPERIMENTS, SUPPLEMENTARY_DIAGNOSTIC_EXPERIMENTS
 
 
-DEFAULT_EXPERIMENTS = list(FINAL_MAIN_EXPERIMENTS)
+DEFAULT_EXPERIMENTS = list(REPORT_EXPERIMENTS)
 
 
 def experiment_dirs(selected, all_existing=False):
@@ -39,6 +39,7 @@ def plot_experiment(result_dir):
     for fold in sorted(history["fold"].unique(), key=lambda f: plotting.EXPECTED_FOLDS.index(f) if f in plotting.EXPECTED_FOLDS else 99):
         sub = history[history["fold"] == fold].sort_values("epoch")
         label = plotting.FOLD_LABELS.get(fold, fold)
+        scope = "supplementary diagnostic - fold1_iberia" if name in SUPPLEMENTARY_DIAGNOSTIC_EXPERIMENTS else status
         suffix = "" if "val_loss" in sub.columns else " (training loss only; val_loss not logged)"
         plotting.save_objective_loss_curve(
             sub,
@@ -49,16 +50,21 @@ def plot_experiment(result_dir):
         plotting.save_performance_curve(
             sub,
             out_dir / f"{fold}_validation_performance.png",
-            f"{name} - {label}: validation RMSE/MAE ({status})",
+            f"{name} - {label}: validation RMSE/MAE ({scope})",
             best_epochs.get(fold),
         )
-    plotting.save_summary_grid(
-        history,
-        result_dir / "figures" / "learning_curves_summary.png",
-        name,
-        status,
-        best_epochs,
-    )
+    if status == "complete 8-fold CV":
+        plotting.save_summary_grid(
+            history,
+            result_dir / "figures" / "learning_curves_summary.png",
+            name,
+            status,
+            best_epochs,
+        )
+    else:
+        old_summary = result_dir / "figures" / "learning_curves_summary.png"
+        if old_summary.exists():
+            old_summary.unlink()
     print(f"wrote {name} learning curves ({status})")
     return True
 

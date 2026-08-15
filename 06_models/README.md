@@ -182,20 +182,25 @@ prediction require one explicitly selected experiment.
 Current result-folder classification:
 
 ```text
-MAIN / FINAL REPORT
-  cnn_deep_wide
-  resnet_frozen
+MAIN
+  cnn_deep_wide - full 8-fold CV
+  resnet_frozen - full 8-fold CV
 
-DEVELOPMENT / DIAGNOSTIC
-  cnn
-  cnn_deep
-  cnn_large
-  resnet_full
+SUPPLEMENTARY
+  cnn - full 8-fold CV
+  cnn_deep - fold1_iberia diagnostic
+  cnn_large - fold1_iberia width-only diagnostic
+  resnet_full - fold1_iberia diagnostic
+  data-size ablation - cnn_deep_wide vs resnet_frozen
 
 HISTORICAL / SUPERSEDED
   resnet
   resnet_layer4
 ```
+
+The one-fold runs are deliberately low-cost architecture/fine-tuning
+diagnostics. They should not be read as estimates of overall European
+geographic generalization.
 
 ## Learning-Curve Plots
 
@@ -499,28 +504,26 @@ consistent.
 
 ## Results And Experiment Identity
 
-New results are separated by experiment:
+Active report results are separated by experiment:
 
 ```text
-results/resnet_frozen/
-results/resnet_full/
-results/cnn/
-results/cnn_wide/
-results/cnn_deep/
-results/cnn_deep_wide/
+results/cnn_deep_wide/   main full CV
+results/resnet_frozen/   main full CV
+results/cnn/             supplementary full CV
+results/cnn_deep/        supplementary fold1_iberia diagnostic
+results/cnn_large/       supplementary fold1_iberia width-only diagnostic
+results/resnet_full/     supplementary fold1_iberia fine-tuning diagnostic
 ```
 
-`results/cnn_large/` may still exist as historical output from the earlier wide
-CNN naming. It should not be overwritten or treated as active.
-
-`results/resnet_layer4/` may still exist as historical output from a superseded
-development experiment. It should not be overwritten or treated as active.
+Superseded `resnet/` and `resnet_layer4/` outputs are archived under
+`results/archive/historical/`. They are provenance, not active report results.
 
 Each experiment folder can contain:
 
 - `cv_history.csv`: one row per completed CV epoch, with the experiment, fold,
-  epoch, training loss, train and validation metrics, optimizer learning rates,
-  timing diagnostics, best-so-far flag, and patience counter;
+  epoch, training loss, validation objective loss for finalized reruns, train
+  and validation metrics, optimizer learning rates, timing diagnostics,
+  best-so-far flag, and patience counter;
 - `cv_folds.csv`: one row per fold and pollutant, with station counts, buffer
   removals, best epoch, validation metrics, baseline RMSE, and parameter counts;
 - `eea_cv_results.json`: per-fold CV metrics, baseline metrics, buffer counts,
@@ -544,18 +547,18 @@ After one or more CV runs have finished, create comparison tables with:
 python3 06_models/summarize_cv_results.py
 ```
 
-The summarizer reads only existing result folders. It reports missing
-experiments instead of inventing numbers. It reads completed CV outputs only and
-does not inspect final-model or sealed TEST outputs. It writes:
+The default summarizer writes report-oriented outputs and does not inspect
+final-model or sealed TEST outputs:
 
 ```text
-results/summary/experiment_comparison.csv
-results/summary/fold_comparison.csv
+results/summary/main_model_comparison.csv
+results/summary/main_fold_comparison.csv
+results/summary/supplementary_full_cv.csv
+results/summary/iberia_diagnostics.csv
 ```
 
-The older `results/resnet/` directory may contain earlier frozen-ResNet outputs.
-Leave those files as historical outputs unless their exact configuration is
-known.
+Use `python3 06_models/summarize_cv_results.py --all-existing` for the
+classified provenance summary under `results/summary/all_existing/`.
 
 Generated checkpoints and large result files should usually stay out of Git
 unless they are intentionally needed for hand-in or reproducibility.

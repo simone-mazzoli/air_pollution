@@ -88,7 +88,8 @@ frozen                          53,120
 
 The previous `resnet_layer4` development experiment is superseded because CV
 looked essentially identical to `resnet_frozen`. Its old result folder is kept
-as historical output, but it is no longer an active experiment choice.
+under `06_models/results/archive/historical/resnet_layer4/`, but it is no
+longer an active experiment choice.
 
 ## BatchNorm Behavior
 

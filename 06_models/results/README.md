@@ -1,112 +1,90 @@
 # Results
 
-This folder contains generated modeling outputs. Results are separated by
-experiment so that frozen ResNet, full-backbone fine-tuned ResNet, and scratch
-CNN runs do not overwrite each other.
+This folder contains generated modeling outputs. The active root is reserved
+for experiments that are part of the final report workflow.
 
-Current experiment folders:
+## Active Report Results
 
 ```text
-resnet_frozen/
-resnet_full/
-cnn/
-cnn_wide/
-cnn_deep/
-cnn_deep_wide/
+cnn_deep_wide/   MAIN: selected scratch CNN, full 8-fold CV
+resnet_frozen/   MAIN: frozen pretrained ResNet, full 8-fold CV
+cnn/             SUPPLEMENTARY: compact scratch CNN, full 8-fold CV
+cnn_deep/        SUPPLEMENTARY: depth-only Iberia diagnostic
+cnn_large/       SUPPLEMENTARY: width-only Iberia diagnostic
+resnet_full/     SUPPLEMENTARY: full fine-tuning Iberia diagnostic
+summary/         report tables and classified supplementary summaries
 ```
 
-`cnn_large/` may still exist as historical output from the earlier wide-CNN
-naming. The active wide result folder is now `cnn_wide/`.
+The one-fold diagnostics are deliberately limited to `fold1_iberia`. They are
+low-cost development comparisons, not estimates of full European geographic
+generalization.
 
-`resnet_layer4/` may still exist as historical output from a superseded
-development experiment. Keep it for reference; it is not part of the active
-candidate list.
+## Archive
 
-The older `resnet/` folder may contain earlier frozen-ResNet outputs from before
-the result paths were split by experiment. Keep it as historical output unless
-the exact run configuration is known. Do not automatically relabel it as
-`resnet_frozen`.
-
-## Cross-Validation Outputs
-
-`eea_cv_results.json` is written by:
-
-```bash
-python3 06_models/01_train_cv.py --experiment all
+```text
+archive/historical/resnet/
+archive/historical/resnet_layer4/
+archive/pre_val_loss_rerun/
 ```
 
-It contains per-fold validation metrics, baseline metrics, station counts,
-buffer-removal counts, best epoch, epochs run, batch metadata, parameter counts,
-model metadata, and the config used for the run.
+`archive/historical/` preserves superseded experiment outputs. In particular,
+the old `resnet/` folder contains historical TEST-related outputs; do not use
+those as the current final TEST result.
 
-`cv_history.csv` is also written during CV. It has one row for each completed
-epoch, so useful history remains available even if a long run is interrupted.
-It stores training loss, train and validation metrics, learning rates, timing
-diagnostics, the best-so-far flag, and the patience counter.
+`archive/pre_val_loss_rerun/` is used by the final suite to preserve old CV
+histories, folds, predictions, results JSON, and metadata before replacing them
+with reruns that include validation objective loss.
 
-`cv_folds.csv` is the compact fold table for later analysis. It stores one row
-per fold and pollutant with station counts, 100 km buffer removals, best epoch,
-validation metrics, baseline RMSE, and parameter counts.
-
-`eea_cv_predictions.csv` contains out-of-fold validation predictions with station
-metadata such as station code, country, land, coordinates, and fold where those
-columns are available.
-
-`run_metadata.json` records the experiment name, model type, pollutant list,
-configuration, fold setup, buffer distance, parameter counts, Git state,
-Python/PyTorch/CUDA/device information, and run timestamps.
-
-## Final Checkpoint
-
-`final_model.pt` is written by:
-
-```bash
-python3 06_models/02_train_final.py --experiment <selected_experiment>
-```
-
-It contains the model weights plus the information needed to reproduce test
-prediction with the same preprocessing:
-
-- model config;
-- selected streams;
-- pollutant list;
-- target normalization values;
-- Sentinel-5P training statistics;
-- arithmetic train-mean baseline concentration;
-- buffer metadata;
-- CV `best_epoch` values;
-- final epoch count;
-- parameter counts.
-
-## Sealed Test Predictions
-
-`test_predictions.csv` is written by:
-
-```bash
-python3 06_models/03_predict_test.py --experiment <selected_experiment>
-```
-
-It contains sealed TEST predictions with station metadata and true labels where
-available. This file should only be produced after the model choice has been
-made from development-fold CV.
-
-Large checkpoints and generated prediction files should usually stay out of Git
-unless they are intentionally needed for hand-in or reproducibility.
+Archived results are scientific provenance. They should not be used as the
+default final comparison.
 
 ## Summary Outputs
 
-After one or more CV runs are complete, run:
+Run:
 
 ```bash
 python3 06_models/summarize_cv_results.py
 ```
 
-The script reads available CV experiment folders only. It does not inspect final
-checkpoints or sealed TEST predictions. It writes:
+Report-oriented outputs:
 
 ```text
-summary/experiment_comparison.csv
-summary/fold_comparison.csv
+summary/main_model_comparison.csv
+summary/main_fold_comparison.csv
+summary/supplementary_full_cv.csv
+summary/iberia_diagnostics.csv
 ```
 
-It reports experiments that are still missing instead of filling in fake values.
+Optional classified provenance summary:
+
+```bash
+python3 06_models/summarize_cv_results.py --all-existing
+```
+
+This writes:
+
+```text
+summary/all_existing/all_experiments_classified.csv
+summary/all_existing/all_fold_results_classified.csv
+```
+
+## File Meanings
+
+Each experiment directory may contain:
+
+- `cv_history.csv`: epoch-level training history, including `train_loss` and,
+  for finalized reruns, `val_loss`.
+- `cv_folds.csv`: per-fold validation metrics and counts.
+- `eea_cv_predictions.csv`: out-of-fold validation predictions.
+- `eea_cv_results.json`: full CV results, including pooled OOF metrics.
+- `run_metadata.json`: configuration and environment metadata.
+- `figures/`: generated plots that can be recreated from histories/results.
+
+The selected final checkpoint and current TEST predictions stay in:
+
+```text
+cnn_deep_wide/final_model.pt
+cnn_deep_wide/test_predictions.csv
+```
+
+Do not move or overwrite those files during development-suite reruns.
