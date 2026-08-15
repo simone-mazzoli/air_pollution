@@ -3,9 +3,7 @@ This folder downloads satellite image patches. A patch is a small image window
 centered on a sensor or station. The model uses these patches as inputs.
 Run commands from the repository root.
 
-Sensor.Community/UBA download scripts live in `sensors-related/README.md`
-(low-cost branch, not used in the final model). This page covers the EEA
-patch-download pipeline.
+
 
 ## Setup
 These scripts require Google Earth Engine access. If `client_id_GEE.txt` exists
