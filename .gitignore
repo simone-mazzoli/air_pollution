@@ -4,9 +4,9 @@ task/
 venv/
 client_id_GEE.txt
 .vscode/
-.vscode
 __pycache__/
 *.py[cod]
 .DS_Store
 ._*
 06_models/02_resnet/final_model.pt
+04_GEE/sensors-related/

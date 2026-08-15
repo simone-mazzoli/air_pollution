@@ -1,72 +1,46 @@
 # 04 Google Earth Engine Satellite Data
-
 This folder downloads satellite image patches. A patch is a small image window
 centered on a sensor or station. The model uses these patches as inputs.
-
 Run commands from the repository root.
 
-# EEA scripts summary:
-
-01_download_eea_patches.py fetches Sentinel-2 (local + wide-context multispectral) and Sentinel-5P (NO2, aerosol index, CO) satellite patches, plus a static Copernicus DEM elevation patch, for every EEA air-quality station across Europe via Earth Engine's computePixels.
-
-02_download_dense_grid_patches.py extract the same patches type across north eastern Germany, building a 10km regular grid. It therefore prodices a continuous pollution map. Imports the same fetch logic as script 01.
-
-In both scripts streams are independently selectable and resumable and each filters out corrupted patches (e.g. cloud filtering).
+Sensor.Community/UBA download scripts live in `sensors-related/README.md`
+(low-cost branch, not used in the final model). This page covers the EEA
+patch-download pipeline.
 
 ## Setup
-
 These scripts require Google Earth Engine access. If `client_id_GEE.txt` exists
 at the repository root and contains a service-account JSON key, the scripts use
 it. Otherwise they try interactive Earth Engine authentication.
-
 The Earth Engine project id is currently hard-coded in the scripts as
 `air-pollution-501614`.
 
-## Main Sentinel-2 Scripts
-
+## Main Scripts
 | Script | What it does | Main output |
 | --- | --- | --- |
-| `sensors-related/01_download_satellite_patches.py` | Downloads Sentinel-2 patches for Sensor.Community label locations. | `data/processed/satellite/high_res_multispec/*.npy`, `low_res_multispec/*.npy`, `manifest.csv` |
-| `sensors-related/02_inspect_patches.py` | Makes a preview image so we can quickly see whether downloaded patches look reasonable. | `data/processed/satellite/preview_patches.png` |
-| `sensors-related/05_download_satellite_patches_uba.py` | Downloads Sentinel-2 patches centered on UBA reference stations. | station-centered arrays under `data/processed/satellite/` |
-| `01_download_satellite_patches_eea.py` | Downloads Sentinel-2 and Sentinel-5P satellite patches per EEA station (one file per (station, stream) combination). | `data/processed/satellite_eea/<stream_folder>/<station_code>.npy` |
-
-
-
-Sentinel-2 is optical satellite imagery. We use it because local land cover,
-roads, vegetation, and urban structure can help predict pollution.
+| `01_download_eea_patches.py` | Downloads Sentinel-2 (high-res local + low-res wide-context), Sentinel-5P (NO2, aerosol index, CO, plus a wide-context aerosol stream), and a static Copernicus DEM elevation patch, per EEA station across Europe. Streams are independently selectable, resumable, and filtered for cloud cover/nodata. | `data/processed/satellite_eea/<stream_folder>/<station_code>.npy`, `manifest_<stream>.csv` |
+| `02_download_dense_grid_patches.py` | Builds a 10 km regular grid over the sealed-test Laender (points kept only where they fall inside the actual Land polygons, from FAO/GAUL boundaries) and downloads the same stream types for continuous pollution-map inference. Reuses `01_download_eea_patches.py`'s fetch logic directly rather than reimplementing it. | `data/processed/satellite_grid/<stream_folder>/<grid_id>.npy`, `data/processed/eea/grid_points.csv` |
 
 ## Usual Commands
-
 ```bash
-python3 04_GEE/sensors-related/01_download_satellite_patches.py --limit 25
-python3 04_GEE/sensors-related/01_download_satellite_patches.py
-python3 04_GEE/sensors-related/02_inspect_patches.py --n 10
-python3 04_GEE/01_download_satellite_patches_eea.py --stream high_res low_res no2 aer co 
+python3 04_GEE/01_download_eea_patches.py --stream high_res low_res no2 aer co
+python3 04_GEE/02_download_dense_grid_patches.py --stream high_res low_res no2 co aer_wide dem
 ```
-
-Use `--limit` for a small test before starting a full download. A full run can
-take a long time and create many `.npy` files.
-
-## Sentinel-5P Scripts
-
-| Script | Status | Notes |
-| --- | --- | --- |
-| `03_download_s5p_patches.py` | experimental | Downloads S5P patches for sensor locations. Options include `--product`, `--force`, and `--limit`. |
-| `04_download_s5p_nation.py` | experimental | Downloads national S5P rasters and crops per-location windows with `--download` and `--crop`. |
-| `06_download_s5p_patches_uba.py` | experimental | Downloads S5P patches for UBA stations. |
-
-Sentinel-5P is much coarser than Sentinel-2 but measures atmospheric products
-such as NO2. These streams are not fully integrated into the main trainer yet.
+`01_download_eea_patches.py` also takes `--country` (restrict to specific
+countries) and `--limit` (first N stations, for testing). Both scripts skip
+already-downloaded patches unless `--force`.
 
 ## Current Patch Assumptions
-
 - The year is fixed to 2024.
-- Sentinel-2 uses `COPERNICUS/S2_SR_HARMONIZED` with a cloud filter and median
-  composite.
-- High-resolution patches are `120 x 120` pixels over about `1.2 km`.
-- Low-resolution patches are `60 x 60` pixels over about `12 km`.
+- Bounding box is EU-wide (covers all EEA-reporting countries), not
+  Germany-only.
+- Sentinel-2 uses `COPERNICUS/S2_SR_HARMONIZED` with a cloud filter
+  (`CLOUDY_PIXEL_PERCENTAGE < 20`) and annual median composite.
+- `high_res`: `120 x 120` px @ 10 m/px (1.2 km). `low_res`: `60 x 60` px @
+  200 m/px (12 km).
+- `no2`/`aer`/`co`: `5 x 5` px @ 7 km/px (35 km). `aer_wide`: `31 x 31` px @
+  7 km/px (217 km).
+- `dem`: static Copernicus GLO-30 mosaic, `60 x 60` px @ 200 m/px (12 km), no
+  date filter.
 - Patch arrays are generated locally and should not be committed.
 
-The next folder for the current baseline is
-[06_models/02_resnet](../06_models/02_resnet/README.md).
+
