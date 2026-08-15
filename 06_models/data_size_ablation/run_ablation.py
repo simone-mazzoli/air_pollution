@@ -2,6 +2,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import numpy as np
 import pandas as pd
@@ -258,34 +259,81 @@ def canonical_runs(model_name):
     return rows
 
 
+def reduced_run_rows(payload):
+    result = payload["result"]
+    config = payload["config"]
+    counts = result["parameter_counts"]
+    rows = []
+    for pollutant, vals in ((p, result[p]) for p in config["pollutants"]):
+        rows.append({
+            "model": payload["model"],
+            "validation_fold": payload["validation_fold"],
+            "fraction": payload["fraction"],
+            "seed": payload["seed"],
+            "pollutant": pollutant,
+            "n_train_before_buffer": payload["n_train_before_buffer"],
+            "n_buffer_dropped": payload["n_buffer_dropped"],
+            "n_train_after_buffer": payload["n_train_after_buffer"],
+            "n_train_sampled": payload["n_train_sampled"],
+            "sampled_counts_by_source_fold": row_counts(payload["sampled_counts_by_source_fold"]),
+            "best_epoch": result["best_epoch"],
+            "rmse": vals["rmse"],
+            "mae": vals["mae"],
+            "r2": vals["r2"],
+            "n_validation": vals["n"],
+            "total_parameters": counts["total"],
+            "trainable_parameters": counts["trainable"],
+            "frozen_parameters": counts["frozen"],
+            "source": "ablation_run",
+        })
+    return rows
+
+
+def expected_reduced_run_count():
+    return len(MODELS) * len([f for f in FRACTIONS if f < 1.0]) * len(SUBSAMPLING_SEEDS) * len(folds.FOLD_ORDER)
+
+
+def verify_reduced_runs_complete():
+    missing = []
+    incompatible = []
+    found = {}
+    for model_name in MODELS:
+        for fraction in (f for f in FRACTIONS if f < 1.0):
+            count = 0
+            for seed in SUBSAMPLING_SEEDS:
+                for fold in folds.FOLD_ORDER:
+                    path = run_path(model_name, fraction, seed, fold)
+                    sidecars_exist = path.exists() and prediction_path(model_name, fraction, seed, fold).exists() and history_path(model_name, fraction, seed, fold).exists()
+                    if not sidecars_exist:
+                        missing.append(path)
+                        continue
+                    try:
+                        payload = json.loads(path.read_text())
+                        reduced_run_rows(payload)
+                    except Exception as exc:
+                        incompatible.append((path, exc))
+                        continue
+                    count += 1
+            found[(model_name, fraction)] = count
+    total = sum(found.values())
+    for (model_name, fraction), count in found.items():
+        print(f"{model_name} {fraction_tag(fraction)}: found {count}/24 reduced runs")
+    print(f"overall reduced-data runs: found {total}/{expected_reduced_run_count()}")
+    if missing:
+        preview = "\n".join(str(p) for p in missing[:12])
+        more = "" if len(missing) <= 12 else f"\n... and {len(missing) - 12} more"
+        raise SystemExit(f"Missing reduced-data ablation artifacts:\n{preview}{more}")
+    if incompatible:
+        preview = "\n".join(f"{path}: {exc}" for path, exc in incompatible[:12])
+        more = "" if len(incompatible) <= 12 else f"\n... and {len(incompatible) - 12} more"
+        raise SystemExit(f"Incompatible reduced-data ablation JSON:\n{preview}{more}")
+
+
 def reduced_runs(model_name):
     rows = []
     for path in sorted((RUNS_DIR / model_name).glob("frac_*/*/*.json")):
         payload = json.loads(path.read_text())
-        result = payload["result"]
-        counts = result["parameter_counts"]
-        for pollutant, vals in ((p, result[p]) for p in result["config"]["pollutants"]):
-            rows.append({
-                "model": model_name,
-                "validation_fold": payload["validation_fold"],
-                "fraction": payload["fraction"],
-                "seed": payload["seed"],
-                "pollutant": pollutant,
-                "n_train_before_buffer": payload["n_train_before_buffer"],
-                "n_buffer_dropped": payload["n_buffer_dropped"],
-                "n_train_after_buffer": payload["n_train_after_buffer"],
-                "n_train_sampled": payload["n_train_sampled"],
-                "sampled_counts_by_source_fold": row_counts(payload["sampled_counts_by_source_fold"]),
-                "best_epoch": result["best_epoch"],
-                "rmse": vals["rmse"],
-                "mae": vals["mae"],
-                "r2": vals["r2"],
-                "n_validation": vals["n"],
-                "total_parameters": counts["total"],
-                "trainable_parameters": counts["trainable"],
-                "frozen_parameters": counts["frozen"],
-                "source": "ablation_run",
-            })
+        rows.extend(reduced_run_rows(payload))
     return rows
 
 
@@ -308,6 +356,7 @@ def prediction_frames(model_name):
 
 
 def summarize():
+    verify_reduced_runs_complete()
     run_rows = []
     pred_frames = []
     for model_name in MODELS:
@@ -442,6 +491,58 @@ def self_check():
     assert counts["fold3_italy"] == 4
     keys = ["validation_fold", "fraction", "seed", "station_code"]
     assert len(sampled) == len(sampled.drop_duplicates(keys))
+    payload = {
+        "run_key": {"model": "cnn_deep_wide", "validation_fold": "fold1_iberia", "fraction": 0.5, "seed": 1, "station_codes": ["a0"]},
+        "model": "cnn_deep_wide",
+        "validation_fold": "fold1_iberia",
+        "fraction": 0.5,
+        "seed": 1,
+        "n_train_before_buffer": 13,
+        "n_buffer_dropped": 3,
+        "n_train_after_buffer": 10,
+        "n_train_sampled": 5,
+        "source_counts_after_buffer": {"fold2_france": 6, "fold3_italy": 4},
+        "sampled_counts_by_source_fold": {"fold2_france": 3, "fold3_italy": 2},
+        "result": {
+            "best_epoch": 2,
+            "parameter_counts": {"total": 10, "trainable": 8, "frozen": 2},
+            "pm25": {"rmse": 1.2, "mae": 0.9, "r2": 0.3, "n": 4},
+        },
+        "prediction_file": "runs/cnn_deep_wide/frac_050/seed_001/fold1_iberia.predictions.csv",
+        "history_file": "runs/cnn_deep_wide/frac_050/seed_001/fold1_iberia.history.csv",
+        "config": {"pollutants": ["pm25"]},
+    }
+    row = reduced_run_rows(payload)[0]
+    assert row["model"] == "cnn_deep_wide"
+    assert row["validation_fold"] == "fold1_iberia"
+    assert row["fraction"] == 0.5
+    assert row["seed"] == 1
+    assert row["pollutant"] == "pm25"
+    assert row["rmse"] == 1.2
+    assert row["mae"] == 0.9
+    assert row["r2"] == 0.3
+    assert row["n_validation"] == 4
+    assert row["best_epoch"] == 2
+    assert row["n_train_before_buffer"] == 13
+    assert row["n_buffer_dropped"] == 3
+    assert row["n_train_after_buffer"] == 10
+    assert row["n_train_sampled"] == 5
+    with TemporaryDirectory() as td:
+        old_runs = globals()["RUNS_DIR"]
+        globals()["RUNS_DIR"] = Path(td)
+        try:
+            for model_name in MODELS:
+                for fraction in (f for f in FRACTIONS if f < 1.0):
+                    for seed in SUBSAMPLING_SEEDS:
+                        for fold in folds.FOLD_ORDER:
+                            path = run_path(model_name, fraction, seed, fold)
+                            write_run_result(path, {**payload, "model": model_name, "validation_fold": fold, "fraction": fraction, "seed": seed})
+                            prediction_path(model_name, fraction, seed, fold).write_text("fold,pred,true\nfold1_iberia,1,1\n")
+                            history_path(model_name, fraction, seed, fold).write_text("epoch,val_loss\n1,0.1\n")
+            verify_reduced_runs_complete()
+            assert len(reduced_runs("cnn_deep_wide")) == 48
+        finally:
+            globals()["RUNS_DIR"] = old_runs
     print("data-size ablation self-check passed")
 
 
