@@ -8,7 +8,7 @@ from torch.utils.data import TensorDataset
 
 from shared import data, evaluation, experiment, folds, paths, runtime, summary, training
 from shared.config import CPU_INTEROP_THREADS, CPU_THREADS, NUM_WORKERS, result_paths
-from shared.models import DEFAULT_CV_EXPERIMENTS, SUMMARY_EXPERIMENTS, SUPPORTED_EXPERIMENTS, cv_run_plan, require_single_experiment, selected_model
+from shared.models import DEFAULT_CV_EXPERIMENTS, FINAL_MAIN_EXPERIMENTS, SUMMARY_EXPERIMENTS, SUPPORTED_EXPERIMENTS, cv_run_plan, require_single_experiment, selected_model
 from cnn.config import BASE_HIGH_CHANNELS, WIDE_HIGH_CHANNELS
 from cnn.model import ScratchHighEncoder
 from resnet.config import RESNET_CONFIG
@@ -107,11 +107,13 @@ def check_scratch_cnn():
 
 
 def check_experiment_artifacts():
-    assert DEFAULT_CV_EXPERIMENTS == ("cnn", "resnet_frozen", "resnet_full")
-    assert SUPPORTED_EXPERIMENTS == ("cnn", "resnet_frozen", "resnet_full", "cnn_deep")
-    assert cv_run_plan("all", None) == [(name, None, False) for name in DEFAULT_CV_EXPERIMENTS]
+    assert FINAL_MAIN_EXPERIMENTS == ("cnn_deep_wide", "resnet_frozen")
+    assert DEFAULT_CV_EXPERIMENTS == FINAL_MAIN_EXPERIMENTS
+    assert SUPPORTED_EXPERIMENTS == ("cnn", "cnn_deep", "cnn_deep_wide", "resnet_frozen", "resnet_full")
+    assert cv_run_plan("all", None) == [("cnn_deep", None, True), ("resnet_frozen", None, False)]
     assert cv_run_plan("all", ["fold1_iberia"]) == [
-        (name, ["fold1_iberia"], False) for name in DEFAULT_CV_EXPERIMENTS
+        ("cnn_deep", ["fold1_iberia"], True),
+        ("resnet_frozen", ["fold1_iberia"], False),
     ]
     assert cv_run_plan("cnn_deep", ["fold1_iberia"], wide=True) == [
         ("cnn_deep", ["fold1_iberia"], True)
@@ -123,7 +125,7 @@ def check_experiment_artifacts():
             assert "requires one explicitly selected experiment" in str(exc)
         else:
             raise AssertionError(f"{stage} should reject --experiment all")
-    for bad_name in ("all", "resnet_full"):
+    for bad_name in ("all", "resnet_full", "cnn_deep_wide"):
         try:
             cv_run_plan(bad_name, None, wide=True)
         except SystemExit:
@@ -193,7 +195,7 @@ def write_fake_result(name, pollutant="pm25"):
     )
     pd.DataFrame([{
         "experiment": name,
-        "fold": "fold1_iberia",
+        "fold": fold,
         "pollutant": pollutant,
         "n_train": 10,
         "n_val": 5,
@@ -207,7 +209,7 @@ def write_fake_result(name, pollutant="pm25"):
         "total_parameters": 100,
         "trainable_parameters": 80,
         "frozen_parameters": 20,
-    }]).to_csv(result["cv_folds"], index=False)
+    } for fold in folds.FOLD_ORDER]).to_csv(result["cv_folds"], index=False)
 
 
 def check_summary_script_logic():
@@ -219,9 +221,10 @@ def check_summary_script_logic():
         try:
             write_fake_result("cnn")
             partial = summary.summarize_results()
-            assert partial["available"] == ["cnn"]
+            assert partial["available"] == []
+            assert "cnn_deep_wide" in partial["missing"]
             assert "resnet_frozen" in partial["missing"]
-            assert len(partial["comparison"]) == 1
+            assert len(partial["comparison"]) == 0
 
             write_fake_result("resnet_frozen")
             write_fake_result("resnet_full")
@@ -233,12 +236,15 @@ def check_summary_script_logic():
             assert complete["missing"] == []
             assert (paths.RESULTS / "summary" / "experiment_comparison.csv").exists()
             assert (paths.RESULTS / "summary" / "fold_comparison.csv").exists()
+            all_existing = summary.summarize_all_existing()
+            assert "cnn" in set(all_existing["comparison"]["experiment"])
+            assert "status" in all_existing["comparison"].columns
         finally:
             paths.RESULTS = old_results
 
 
 def check_prediction_analysis_script():
-    script = Path(__file__).resolve().parents[1] / "07_prediction_analysis" / "analyze_test_predictions.py"
+    script = Path(__file__).resolve().parents[1] / "07_prediction_analysis" / "01_analyze_test_predictions.py"
     assert script.exists()
     spec = importlib.util.spec_from_file_location("prediction_analysis", script)
     module = importlib.util.module_from_spec(spec)
@@ -349,6 +355,18 @@ def check_joint_target_masks():
             data.paths.SAT = old_sat
 
 
+def check_masked_loss_logging_objective():
+    lossf = torch.nn.SmoothL1Loss(reduction="none")
+    pred = torch.tensor([[0.0, 2.0], [1.0, 4.0]])
+    y = torch.tensor([[1.0, 0.0], [1.5, 1.0]])
+    mask = torch.tensor([[1.0, 0.0], [1.0, 1.0]])
+    loss_sum, count = training.masked_loss_sum_count(pred, y, mask, lossf)
+    expected = (lossf(pred, y) * mask).sum() / mask.sum()
+    assert count.item() == 3.0
+    assert torch.isclose(loss_sum / count, expected)
+    assert torch.isclose(training.masked_loss(pred, y, mask, lossf), expected)
+
+
 def main():
     runtime.apply_runtime_config()
     assert torch.get_num_threads() == CPU_THREADS
@@ -361,6 +379,7 @@ def main():
     check_patch_cache()
     check_configured_pollutant_filtering()
     check_joint_target_masks()
+    check_masked_loss_logging_objective()
 
     train = pd.DataFrame({
         "station_code": ["near", "far"],

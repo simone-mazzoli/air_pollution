@@ -5,10 +5,29 @@ import pandas as pd
 
 from . import paths
 from .config import result_paths
-from .models import SUMMARY_EXPERIMENTS
+from .folds import FOLD_ORDER
+from .models import (
+    ALL_RESULT_EXPERIMENTS,
+    DIAGNOSTIC_EXPERIMENTS,
+    FINAL_MAIN_EXPERIMENTS,
+    HISTORICAL_EXPERIMENTS,
+    SUMMARY_EXPERIMENTS,
+)
 
 
-def summarize_results(experiments=SUMMARY_EXPERIMENTS, out_dir=None):
+def cv_status(name, folds_df):
+    present = set(folds_df["fold"].dropna().unique()) if "fold" in folds_df else set()
+    complete = present == set(FOLD_ORDER)
+    if name in FINAL_MAIN_EXPERIMENTS and complete:
+        return "main_complete_cv"
+    if name in HISTORICAL_EXPERIMENTS:
+        return "historical_complete_cv" if complete else "historical"
+    if name in DIAGNOSTIC_EXPERIMENTS:
+        return "development_complete_cv" if complete else "partial_diagnostic"
+    return "complete_cv" if complete else f"partial_{len(present)}_of_8"
+
+
+def summarize_results(experiments=SUMMARY_EXPERIMENTS, out_dir=None, *, require_complete=True):
     out_dir = paths.RESULTS / "summary" if out_dir is None else out_dir
     rows, fold_frames, missing = [], [], []
     for name in experiments:
@@ -18,6 +37,10 @@ def summarize_results(experiments=SUMMARY_EXPERIMENTS, out_dir=None):
             continue
         cv = json.loads(result["cv_results"].read_text())
         folds = pd.read_csv(result["cv_folds"])
+        status = cv_status(name, folds)
+        if require_complete and status != "main_complete_cv":
+            missing.append(f"{name} ({status})")
+            continue
         fold_frames.append(folds)
         pooled = cv.get("pooled_out_of_fold", {})
         for pollutant in sorted(folds["pollutant"].unique()):
@@ -25,6 +48,7 @@ def summarize_results(experiments=SUMMARY_EXPERIMENTS, out_dir=None):
             pooled_metrics = pooled.get(pollutant, {})
             rows.append({
                 "experiment": name,
+                "status": status,
                 "pollutant": pollutant,
                 "pooled_cv_rmse": pooled_metrics.get("rmse"),
                 "pooled_cv_mae": pooled_metrics.get("mae"),
@@ -47,3 +71,8 @@ def summarize_results(experiments=SUMMARY_EXPERIMENTS, out_dir=None):
     available = sorted({r["experiment"] for r in rows})
     return {"available": available, "missing": missing,
             "comparison": comparison, "fold_comparison": fold_comparison}
+
+
+def summarize_all_existing(out_dir=None):
+    out_dir = paths.RESULTS / "summary" / "all_existing" if out_dir is None else out_dir
+    return summarize_results(ALL_RESULT_EXPERIMENTS, out_dir=out_dir, require_complete=False)

@@ -15,6 +15,27 @@ def masked_loss(pred, y, mask, lossf):
     return (per * mask).sum() / mask.sum().clamp(min=1)
 
 
+def masked_loss_sum_count(pred, y, mask, lossf):
+    per = lossf(pred, y)
+    return (per * mask).sum(), mask.sum()
+
+
+@torch.no_grad()
+def objective_loss(model, loader, lossf):
+    model.eval()
+    loss_sum = torch.tensor(0.0, device=DEVICE)
+    valid_count = torch.tensor(0.0, device=DEVICE)
+    for xh, xl, xs_patch, xw, xd, xs_mean, y, m in loader:
+        xh, xl, xs_patch, xw, xd, xs_mean, y, m = (
+            xh.to(DEVICE), xl.to(DEVICE), xs_patch.to(DEVICE), xw.to(DEVICE),
+            xd.to(DEVICE), xs_mean.to(DEVICE), y.to(DEVICE), m.to(DEVICE))
+        batch_sum, batch_count = masked_loss_sum_count(
+            model(xh, xl, xs_patch, xw, xd, xs_mean), y, m, lossf)
+        loss_sum += batch_sum
+        valid_count += batch_count
+    return float((loss_sum / valid_count.clamp(min=1)).cpu())
+
+
 def sync_if_cuda():
     if DEVICE == "cuda":
         torch.cuda.synchronize()
@@ -148,10 +169,11 @@ def train_one_fold(train_df, val_df, streams, cfg, build_model, *, fold=None, hi
         sync_if_cuda()
         epoch_start = time.perf_counter()
         model.train()
-        tot = 0.0
         train_start = time.perf_counter()
         train_detail = {k: 0.0 for k in ("data_wait", "to_device", "forward", "backward", "optimizer")}
         train_iter = iter(tr)
+        train_loss_sum = 0.0
+        train_loss_count = 0.0
         for _ in range(len(tr)):
             start = time.perf_counter()
             xh, xl, xs_patch, xw, xd, xs_mean, y, m = next(train_iter)
@@ -171,7 +193,9 @@ def train_one_fold(train_df, val_df, streams, cfg, build_model, *, fold=None, hi
             train_detail["optimizer"] += elapsed(start)
 
             start = time.perf_counter()
-            loss = masked_loss(model(xh, xl, xs_patch, xw, xd, xs_mean), y, m, lossf)
+            pred = model(xh, xl, xs_patch, xw, xd, xs_mean)
+            batch_loss_sum, batch_loss_count = masked_loss_sum_count(pred, y, m, lossf)
+            loss = batch_loss_sum / batch_loss_count.clamp(min=1)
             sync_if_cuda()
             train_detail["forward"] += elapsed(start)
 
@@ -184,13 +208,18 @@ def train_one_fold(train_df, val_df, streams, cfg, build_model, *, fold=None, hi
             opt.step()
             sync_if_cuda()
             train_detail["optimizer"] += elapsed(start)
-            tot += loss.item() * len(xh)
+            train_loss_sum += float(batch_loss_sum.detach().cpu())
+            train_loss_count += float(batch_loss_count.detach().cpu())
         sync_if_cuda()
         train_seconds = time.perf_counter() - train_start
         train_eval_start = time.perf_counter()
         trm, _ = evaluation.evaluate(model, tm, tmean, tstd, cfg)
         sync_if_cuda()
         train_eval_seconds = time.perf_counter() - train_eval_start
+        val_loss_start = time.perf_counter()
+        val_loss = objective_loss(model, va, lossf)
+        sync_if_cuda()
+        val_loss_seconds = time.perf_counter() - val_loss_start
         val_start = time.perf_counter()
         val, _ = evaluation.evaluate(model, va, tmean, tstd, cfg, tta=cfg["tta"])
         sync_if_cuda()
@@ -208,7 +237,7 @@ def train_one_fold(train_df, val_df, streams, cfg, build_model, *, fold=None, hi
             best_so_far = True
         else:
             bad += 1
-        train_loss = tot / len(train_df)
+        train_loss = train_loss_sum / max(train_loss_count, 1.0)
         if history_path is not None:
             row = experiment.epoch_history_row(
                 cfg, fold, ep, train_loss, trm, val, opt,
@@ -216,6 +245,7 @@ def train_one_fold(train_df, val_df, streams, cfg, build_model, *, fold=None, hi
                     "train_seconds": train_seconds,
                     "train_batch_avg_seconds": train_seconds / len(tr),
                     "train_eval_seconds": train_eval_seconds,
+                    "val_loss_seconds": val_loss_seconds,
                     "val_seconds": val_seconds,
                     "total_seconds": total_seconds,
                     "data_wait_seconds": train_detail["data_wait"],
@@ -227,8 +257,9 @@ def train_one_fold(train_df, val_df, streams, cfg, build_model, *, fold=None, hi
                 best_so_far,
                 bad,
             )
+            row["val_loss"] = val_loss
             experiment.append_csv_row(history_path, row)
-        print(f"  [{ep:02d}] loss={train_loss:.3f}")
+        print(f"  [{ep:02d}] loss={train_loss:.3f} val_loss={val_loss:.3f}")
         print(f"       TRAIN  {evaluation.fmt_metrics(trm, cfg)}")
         print(f"       VAL    {evaluation.fmt_metrics(val, cfg)}{flag}")
         print(f"       timing: train={train_seconds:.1f}s "

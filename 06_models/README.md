@@ -21,18 +21,14 @@ eastern Germany are kept as a sealed final test region. "Sealed" means that this
 region is not used for choosing the model architecture, hyperparameters, or
 training settings. It is only used after development choices have been made.
 
-The immediate comparison is:
+The final development comparison is frozen:
 
-- a BigEarthNet-pretrained ResNet50 used for transfer learning;
-- a partially fine-tuned version of the same ResNet50;
-- a CNN trained from scratch.
+- `cnn_deep_wide`: the selected scratch CNN (`cnn_deep --wide`);
+- `resnet_frozen`: the BigEarthNet-pretrained ResNet50 with frozen backbone.
 
 BigEarthNet is a large remote-sensing dataset. Pretraining on it gives the
 ResNet useful satellite-image features before it is trained for pollution. The
-scratch CNN will show how much this pretraining helps compared with learning the
-image features only from our pollution dataset. Later, the same modeling setup
-can be used to make continuous pollution maps instead of only station-level
-predictions.
+scratch CNN shows what can be learned directly from the pollution dataset.
 
 ## Directory Overview
 
@@ -42,11 +38,14 @@ predictions.
 |-- 01_train_cv.py
 |-- 02_train_final.py
 |-- 03_predict_test.py
+|-- run_experiment_suite.py
+|-- plot_learning_curves.py
 |-- summarize_cv_results.py
 |-- check_shared_logic.py
 |-- shared/
 |-- resnet/
 |-- cnn/
+|-- data_size_ablation/
 |-- results/
 `-- archive/
 ```
@@ -62,6 +61,11 @@ predictions.
   TEST stations.
 - `03_predict_test.py` loads the final checkpoint and evaluates the sealed
   northern/eastern Germany TEST stations.
+- `run_experiment_suite.py` is the final development-suite entry point. It runs
+  CV, data-size ablation, summaries, and plots. It does not train the final
+  model or evaluate TEST.
+- `plot_learning_curves.py` creates epoch-wise learning-curve figures from
+  saved CV histories. It does not train models.
 - `summarize_cv_results.py` reads completed CV experiment result folders and
   writes comparison tables under `results/summary/`.
 - `check_shared_logic.py` is a small assertion-based check for modeling logic.
@@ -71,6 +75,8 @@ predictions.
 - `resnet/` contains the BigEarthNet-pretrained ResNet model and ResNet-specific
   settings.
 - `cnn/` contains the scratch-CNN model and its CNN-specific settings.
+- `data_size_ablation/` contains the optional reduced-training-data experiment
+  and plots of model performance as labelled training data decreases.
 - `results/` contains generated CV results, checkpoints, and prediction CSVs.
 - `archive/` keeps older Sensor.Community work that is no longer part of the
   current EEA reference-station pipeline.
@@ -85,17 +91,18 @@ python3 06_models/00_assign_folds.py
 python3 check_model_data.py
 python3 06_models/check_shared_logic.py
 
-# 1. Run development CV for every candidate experiment
-python3 06_models/01_train_cv.py --experiment all
+# 1. Preview the final development suite
+python3 06_models/run_experiment_suite.py --all --dry-run
 
-# 2. Compare CV experiments
-python3 06_models/summarize_cv_results.py
+# 2. Run the final development suite
+python3 06_models/run_experiment_suite.py --all
 
-# 3. After selecting one experiment from CV
-python3 06_models/02_train_final.py --experiment <selected_experiment>
+# 3. Rebuild summaries and plots later without retraining
+python3 06_models/run_experiment_suite.py --postprocess
 
-# 4. Only after model selection is final
-python3 06_models/03_predict_test.py --experiment <selected_experiment>
+# 4. Final training and TEST evaluation are separate, explicit steps only
+python3 06_models/02_train_final.py --experiment cnn_deep --wide
+python3 06_models/03_predict_test.py --experiment cnn_deep --wide
 ```
 
 `00_assign_folds.py` should only be run when `station_fold.csv` genuinely needs
@@ -111,12 +118,16 @@ The steps are:
   needed by the models are present and usable.
 - `check_shared_logic.py`: checks that important modeling assumptions still
   behave as expected in code.
-- `01_train_cv.py`: trains and validates candidate experiments on development
-  folds only. `--experiment all` runs `cnn`, then `resnet_frozen`, then
-  `resnet_full` sequentially. `cnn_deep` and `--wide` CNN variants are opt-in
-  ablations and are not included in `all`.
-- `summarize_cv_results.py`: compares whichever CV experiment result folders
-  have already been produced. It does not inspect sealed TEST results.
+- `01_train_cv.py`: trains and validates development CV folds only. Its
+  `--experiment all` mode now means the final report comparison:
+  `cnn_deep_wide` and `resnet_frozen`.
+- `summarize_cv_results.py`: by default compares only the two final complete-CV
+  experiments. Use `--all-existing` to classify diagnostic and historical
+  result folders.
+- `plot_learning_curves.py`: plots training behavior over epochs using
+  `cv_history.csv`. New histories include both training and validation
+  SmoothL1 objective loss. RMSE/MAE are plotted separately in original PM2.5
+  units.
 - `02_train_final.py`: after one experiment has been chosen, trains a fresh
   model for that experiment on all development folds using the CV-derived epoch
   count. Fold models are not merged.
@@ -128,6 +139,7 @@ The supported experiment names are:
 ```text
 cnn
 cnn_deep
+cnn_deep_wide
 resnet_frozen
 resnet_full
 ```
@@ -138,7 +150,7 @@ Use `--experiment` to choose which one to run:
 python3 06_models/01_train_cv.py --experiment cnn
 ```
 
-To run all candidate CV experiments in the standard order:
+To run the final CV comparison:
 
 ```bash
 python3 06_models/01_train_cv.py --experiment all
@@ -164,8 +176,59 @@ python3 06_models/01_train_cv.py --experiment all --folds fold1_iberia
 ```
 
 Subset runs are useful for debugging, but they are not a full CV result. The
-`all` option is only for CV. Final training and sealed TEST prediction require
-one explicitly selected experiment.
+`all` option is only for development CV. Final training and sealed TEST
+prediction require one explicitly selected experiment.
+
+Current result-folder classification:
+
+```text
+MAIN / FINAL REPORT
+  cnn_deep_wide
+  resnet_frozen
+
+DEVELOPMENT / DIAGNOSTIC
+  cnn
+  cnn_deep
+  cnn_large
+  resnet_full
+
+HISTORICAL / SUPERSEDED
+  resnet
+  resnet_layer4
+```
+
+## Learning-Curve Plots
+
+An epoch-wise learning curve shows how one training run behaves as epochs pass.
+For new final-suite histories, the objective-loss plot shows `train_loss` and
+`val_loss` on the same SmoothL1-loss axis. The validation-performance plot
+separately shows RMSE and MAE in PM2.5 units.
+
+```bash
+python3 06_models/plot_learning_curves.py
+python3 06_models/plot_learning_curves.py --experiment cnn_deep_wide
+python3 06_models/plot_learning_curves.py --all-existing
+```
+
+Outputs are written under:
+
+```text
+06_models/results/<experiment>/figures/
+```
+
+The data-size learning curve is different: it shows model performance as the
+fraction of labelled training stations changes. Those plots live with the
+ablation experiment:
+
+```bash
+python3 06_models/data_size_ablation/plot_results.py
+```
+
+Outputs are written under:
+
+```text
+06_models/data_size_ablation/results/figures/
+```
 
 ## Required Data
 

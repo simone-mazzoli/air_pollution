@@ -19,26 +19,74 @@ def parse_args():
                     help="use wider scratch-CNN channels with --experiment cnn or cnn_deep")
     ap.add_argument("--folds", nargs="+", default=CV_FOLDS,
                     help="optional subset of fold names to run")
+    ap.add_argument("--resume", action="store_true",
+                    help="resume compatible new-schema folds instead of deleting existing CV outputs")
+    ap.add_argument("--force", action="store_true",
+                    help="rerun selected folds even if compatible outputs already exist")
     return ap.parse_args()
 
 
-def run_experiment(experiment_name, selected_folds, wide=False):
+def reset_cv_outputs(result):
+    for key in ("cv_history", "cv_folds", "cv_predictions", "cv_results", "run_metadata"):
+        path = result[key]
+        if path.exists():
+            path.unlink()
+
+
+def history_has_val_loss(path):
+    if not path.exists():
+        return False
+    return "val_loss" in pd.read_csv(path, nrows=0).columns
+
+
+def load_existing_result(result):
+    cv = json.loads(result["cv_results"].read_text()) if result["cv_results"].exists() else {}
+    predictions = pd.read_csv(result["cv_predictions"]) if result["cv_predictions"].exists() else pd.DataFrame()
+    folds_df = pd.read_csv(result["cv_folds"]) if result["cv_folds"].exists() else pd.DataFrame()
+    return cv, predictions, folds_df
+
+
+def fold_complete(fold, cv, predictions, folds_df, history_path):
+    if not history_has_val_loss(history_path):
+        return False
+    if fold not in cv or not isinstance(cv[fold], dict) or "best_epoch" not in cv[fold]:
+        return False
+    if predictions.empty or fold not in set(predictions.get("fold", [])):
+        return False
+    if folds_df.empty or fold not in set(folds_df.get("fold", [])):
+        return False
+    return True
+
+
+def run_experiment(experiment_name, selected_folds, wide=False, *, resume=False, force=False):
     data.seed_everything()
     build_model, model_config = selected_model(experiment_name, wide=wide)
     result = result_paths(model_config["experiment"])
     cfg = training_config(model_config, epochs=CV_EPOCHS, folds=selected_folds)
     started_at = experiment.now_utc()
-    experiment.reset_csv(result["cv_history"])
-    experiment.reset_csv(result["cv_folds"])
+    if force:
+        reset_cv_outputs(result)
+    elif resume and result["cv_history"].exists() and not history_has_val_loss(result["cv_history"]):
+        print(f"{cfg['experiment']}: existing CV history lacks val_loss; resetting CV artifacts for final-suite rerun")
+        reset_cv_outputs(result)
+    elif not resume:
+        reset_cv_outputs(result)
     experiment.write_json(result["run_metadata"], experiment.run_metadata(cfg, started_at=started_at))
     streams = [f"{s}_tropomi" for s in cfg["s5p_streams"]]
     df = data.load_frame(streams, cfg)
     run_folds = cfg["folds"] or folds.development_fold_names()
+    existing_cv, existing_predictions, existing_folds = load_existing_result(result)
 
     print(f"\ndevice: {DEVICE}  |  seed: {SEED}  |  experiment: {cfg['experiment']}  |  running folds: {run_folds}")
     print(f"config: {json.dumps({k: v for k, v in cfg.items() if k != 'folds'})}\n")
     cv, scatter = {}, []
     for fold in run_folds:
+        if resume and not force and fold_complete(
+                fold, existing_cv, existing_predictions, existing_folds, result["cv_history"]):
+            print(f"########## VAL FOLD: {fold} already complete with val_loss, SKIPPING ##########")
+            cv[fold] = existing_cv[fold]
+            scatter.append(existing_predictions[existing_predictions["fold"] == fold].copy())
+            continue
         val_df = df[df["fold"] == fold].reset_index(drop=True)
         train_df = df[df["fold"] != fold].reset_index(drop=True)
         if len(val_df) < 10:
@@ -132,7 +180,7 @@ def main():
             print("\n" + "=" * 60)
             print(f"EXPERIMENT {i}/{len(plan)}: {experiment_name}")
             print("=" * 60)
-        run_experiment(experiment_name, selected_folds, wide)
+        run_experiment(experiment_name, selected_folds, wide, resume=args.resume, force=args.force)
 
 
 if __name__ == "__main__":

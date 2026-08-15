@@ -6,6 +6,7 @@ client_id_GEE.txt
 .vscode/
 __pycache__/
 *.py[cod]
+.ipynb_checkpoints/
 .DS_Store
 ._*
 06_models/02_resnet/final_model.pt
