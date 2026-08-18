@@ -38,7 +38,10 @@ Input:  data/processed/admin_boundaries/vg250_kreis.geojson
         data/processed/socioeconomic/deaths.xlsx
         data/processed/socioeconomic/income_kreislevel.xlsx
         (Arbeitslosenquote is downloaded, cached under data/raw/ba_arbeitslosenquote/)
-Output: data/processed/socioeconomic/socioeconomic_kreis_2024.csv
+Output: 00_kreislevel_data/socioeconomic_kreis_2024.csv
+        (outside data/, which is gitignored, so this small final table gets
+        pushed to the repo instead of needing Drive/WeTransfer like the raw
+        sources)
 """
 
 import json
@@ -51,7 +54,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SOCIO_DIR = BASE_DIR / "data" / "processed" / "socioeconomic"
 ADMIN_DIR = BASE_DIR / "data" / "processed" / "admin_boundaries"
 RAW_DIR = BASE_DIR / "data" / "raw" / "ba_arbeitslosenquote"
-OUT_PATH = SOCIO_DIR / "socioeconomic_kreis_2024.csv"
+# outside data/ (gitignored) so the small final table gets pushed to the repo
+OUT_PATH = BASE_DIR / "08_kreislevel_data" / "socioeconomic_kreis_2024.csv"
 
 YEAR = 2024
 
