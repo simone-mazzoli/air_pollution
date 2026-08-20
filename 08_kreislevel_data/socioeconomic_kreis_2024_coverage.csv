@@ -1,0 +1,16 @@
+variable,n_available,n_total,coverage_pct
+disposable_income_2023_eur_per_capita,398,400,99.5
+foreign_national_2022_pct,400,400,100.0
+immigration_history_2022_pct,400,400,100.0
+median_age_2024,400,400,100.0
+no_vocational_qualification_2022_pct,400,400,100.0
+population_15_64_2024,400,400,100.0
+population_2024,400,400,100.0
+population_65plus_2024,400,400,100.0
+population_density_2024_per_km2,400,400,100.0
+population_under15_2024,400,400,100.0
+share_15_64_2024_pct,400,400,100.0
+share_65plus_2024_pct,400,400,100.0
+share_under15_2024_pct,400,400,100.0
+unemployment_rate_2024_pct,400,400,100.0
+university_degree_2022_pct,400,400,100.0

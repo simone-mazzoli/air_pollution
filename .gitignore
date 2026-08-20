@@ -11,3 +11,4 @@ __pycache__/
 ._*
 06_models/02_resnet/final_model.pt
 04_GEE/sensors-related/
+eea_model_upload_bundle.zip

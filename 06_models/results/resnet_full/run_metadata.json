@@ -121,7 +121,7 @@
     "trainable_backbone_parameters": 23476864,
     "trainable_non_backbone_parameters": 236065
   },
-  "git_commit": "1be29b92229b8838b4ce848663b07a55d91d5991",
+  "git_commit": "eb11dcf4492e268277b917b4a064a42b0eb709fe",
   "git_dirty": true,
   "python": "3.11.6",
   "platform": "Linux-6.8.0-110-generic-x86_64-with-glibc2.35",
@@ -129,8 +129,8 @@
   "cuda": "12.4",
   "device": "cuda",
   "gpu": "NVIDIA H100 80GB HBM3 MIG 4g.40gb",
-  "started_at": "2026-08-08T09:03:35+00:00",
-  "completed_at": "2026-08-08T09:05:51+00:00",
+  "started_at": "2026-08-15T14:52:02+00:00",
+  "completed_at": "2026-08-15T14:54:25+00:00",
   "model_metadata": {
     "model": "resnet",
     "experiment": "resnet_full",

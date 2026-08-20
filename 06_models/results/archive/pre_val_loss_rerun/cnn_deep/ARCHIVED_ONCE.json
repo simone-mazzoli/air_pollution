@@ -1,0 +1,9 @@
+{
+  "archived_artifacts": [
+    "cv_history.csv",
+    "cv_folds.csv",
+    "eea_cv_predictions.csv",
+    "eea_cv_results.json",
+    "run_metadata.json"
+  ]
+}

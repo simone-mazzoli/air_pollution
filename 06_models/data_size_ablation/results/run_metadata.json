@@ -1,0 +1,155 @@
+{
+  "experiment": "data_size_ablation",
+  "model": "cnn",
+  "backbone_mode": null,
+  "high_encoder": null,
+  "pollutants": [
+    "pm25"
+  ],
+  "seed": 123,
+  "config": {
+    "batch": 128,
+    "num_workers": 0,
+    "cache_patches": true,
+    "s5p_streams": [
+      "no2",
+      "co"
+    ],
+    "use_aer_wide": true,
+    "use_dem": true,
+    "tta": true,
+    "buffer_km": 100.0,
+    "max_pm10": 120.0,
+    "max_pm25": 80.0,
+    "pollutants": [
+      "pm25"
+    ],
+    "model": "cnn",
+    "experiment": "data_size_ablation",
+    "wide": true,
+    "high_channels": [
+      48,
+      96,
+      192,
+      384
+    ],
+    "convs_per_block": 3,
+    "lr": 0.0003,
+    "weight_decay": 1e-07,
+    "proj_dim": 64,
+    "dropout": 0.5,
+    "low_cnn_ch1": 32,
+    "low_cnn_ch2": 128,
+    "s5p_cnn_hidden": 32,
+    "head_hidden": 64,
+    "wide_feat": 32,
+    "dem_feat": 32,
+    "epochs": 500,
+    "patience": 25,
+    "folds": [
+      "fold1_iberia",
+      "fold2_france",
+      "fold3_italy",
+      "fold4_alpine",
+      "fold5_north",
+      "fold6_balkan_e",
+      "fold7_balkan_s",
+      "fold8_poland"
+    ],
+    "models": [
+      "cnn_deep_wide",
+      "resnet_frozen"
+    ],
+    "fractions": [
+      0.25,
+      0.5,
+      1.0
+    ],
+    "subsampling_seeds": [
+      1,
+      2,
+      3
+    ],
+    "seed": 123
+  },
+  "fold_setup": {
+    "fold1_iberia": [
+      "PT",
+      "ES",
+      "AD"
+    ],
+    "fold2_france": [
+      "FR",
+      "NL",
+      "BE",
+      "LU"
+    ],
+    "fold3_italy": [
+      "IT",
+      "MT"
+    ],
+    "fold4_alpine": [
+      "DE",
+      "CH",
+      "AT"
+    ],
+    "fold5_north": [
+      "DK",
+      "SE",
+      "NO",
+      "FI",
+      "IS",
+      "IE",
+      "LT",
+      "LV",
+      "EE"
+    ],
+    "fold6_balkan_e": [
+      "HU",
+      "SI",
+      "HR",
+      "BA",
+      "RS",
+      "XK",
+      "ME",
+      "RO",
+      "BG"
+    ],
+    "fold7_balkan_s": [
+      "AL",
+      "GR",
+      "CY",
+      "TR",
+      "MK"
+    ],
+    "fold8_poland": [
+      "PL",
+      "CZ",
+      "SK"
+    ]
+  },
+  "test_laender": [
+    "Berlin",
+    "Brandenburg",
+    "Bremen",
+    "Hamburg",
+    "Mecklenburg-Vorpommern",
+    "Niedersachsen",
+    "Sachsen",
+    "Sachsen-Anhalt",
+    "Schleswig-Holstein",
+    "Thueringen"
+  ],
+  "buffer_km": 100.0,
+  "parameter_counts": null,
+  "git_commit": "eb11dcf4492e268277b917b4a064a42b0eb709fe",
+  "git_dirty": true,
+  "python": "3.11.6",
+  "platform": "Linux-6.8.0-110-generic-x86_64-with-glibc2.35",
+  "torch": "2.6.0+cu124",
+  "cuda": "12.4",
+  "device": "cuda",
+  "gpu": "NVIDIA H100 80GB HBM3 MIG 4g.40gb",
+  "started_at": "2026-08-15T14:54:38+00:00",
+  "completed_at": null
+}

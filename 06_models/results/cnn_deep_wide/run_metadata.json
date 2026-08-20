@@ -125,7 +125,7 @@
     "trainable_high_encoder_parameters": 4406832,
     "trainable_non_high_encoder_parameters": 129569
   },
-  "git_commit": "c53f8db75666df065f2da8880202578a828d6654",
+  "git_commit": "eb11dcf4492e268277b917b4a064a42b0eb709fe",
   "git_dirty": true,
   "python": "3.11.6",
   "platform": "Linux-6.8.0-110-generic-x86_64-with-glibc2.35",
@@ -133,8 +133,8 @@
   "cuda": "12.4",
   "device": "cuda",
   "gpu": "NVIDIA H100 80GB HBM3 MIG 4g.40gb",
-  "started_at": "2026-08-08T09:53:16+00:00",
-  "completed_at": "2026-08-08T10:17:10+00:00",
+  "started_at": "2026-08-15T13:18:20+00:00",
+  "completed_at": "2026-08-15T13:41:22+00:00",
   "model_metadata": {
     "model": "cnn",
     "experiment": "cnn_deep_wide",

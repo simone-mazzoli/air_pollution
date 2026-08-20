@@ -1,0 +1,2 @@
+experiment,fold,pollutant,n_train,n_val,n_buffer_dropped,n_train_before_buffer,best_epoch,rmse,mae,r2,n,baseline_rmse,total_parameters,trainable_parameters,frozen_parameters
+cnn_large,fold1_iberia,pm25,1662,204,3,1665,41,2.5877726951648663,1.944687384688546,-0.010874764893995525,204,4.199973338549879,2771681,2771681,0

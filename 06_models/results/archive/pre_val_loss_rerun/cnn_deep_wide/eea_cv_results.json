@@ -1,0 +1,442 @@
+{
+  "fold1_iberia": {
+    "n_train": 1662,
+    "n_val": 204,
+    "best_epoch": 16,
+    "epochs_run": 41,
+    "best_validation_metric": 2.3634538296865717,
+    "epoch_numbering": "one_based",
+    "n_train_samples": 1662,
+    "n_train_batches": 13,
+    "effective_drop_last": false,
+    "parameter_counts": {
+      "total": 4536401,
+      "trainable": 4536401,
+      "frozen": 0
+    },
+    "model": "cnn",
+    "experiment": "cnn_deep_wide",
+    "high_encoder": "scratch_cnn_48_96_192_384",
+    "wide": true,
+    "high_encoder_channels": [
+      48,
+      96,
+      192,
+      384
+    ],
+    "convs_per_block": 3,
+    "high_encoder_feature_dim": 384,
+    "lr": 0.0003,
+    "total_model_parameters": 4536401,
+    "trainable_high_encoder_parameters": 4406832,
+    "trainable_non_high_encoder_parameters": 129569,
+    "pm25": {
+      "rmse": 2.3634538296865717,
+      "mae": 1.7844066536257512,
+      "r2": 0.1567830103755895,
+      "n": 204,
+      "baseline": 4.199973338549879,
+      "baseline_concentration": 11.398050627024533,
+      "baseline_metrics": {
+        "rmse": 4.199973338549879,
+        "mae": 3.6225221374762793,
+        "r2": -1.6627976873601007,
+        "n": 204
+      }
+    },
+    "buffer_km": 100.0,
+    "buffer_removed_train_stations": 3,
+    "n_train_before_buffer": 1665
+  },
+  "fold2_france": {
+    "n_train": 1392,
+    "n_val": 362,
+    "best_epoch": 22,
+    "epochs_run": 47,
+    "best_validation_metric": 1.8731826506317981,
+    "epoch_numbering": "one_based",
+    "n_train_samples": 1392,
+    "n_train_batches": 11,
+    "effective_drop_last": false,
+    "parameter_counts": {
+      "total": 4536401,
+      "trainable": 4536401,
+      "frozen": 0
+    },
+    "model": "cnn",
+    "experiment": "cnn_deep_wide",
+    "high_encoder": "scratch_cnn_48_96_192_384",
+    "wide": true,
+    "high_encoder_channels": [
+      48,
+      96,
+      192,
+      384
+    ],
+    "convs_per_block": 3,
+    "high_encoder_feature_dim": 384,
+    "lr": 0.0003,
+    "total_model_parameters": 4536401,
+    "trainable_high_encoder_parameters": 4406832,
+    "trainable_non_high_encoder_parameters": 129569,
+    "pm25": {
+      "rmse": 1.8731826506317981,
+      "mae": 1.4626861060454734,
+      "r2": -0.28171838920804704,
+      "n": 362,
+      "baseline": 4.203182751213454,
+      "baseline_concentration": 11.992663107756849,
+      "baseline_metrics": {
+        "rmse": 4.203182751213454,
+        "mae": 3.9304633430672995,
+        "r2": -5.453404835883483,
+        "n": 362
+      }
+    },
+    "buffer_km": 100.0,
+    "buffer_removed_train_stations": 115,
+    "n_train_before_buffer": 1507
+  },
+  "fold3_italy": {
+    "n_train": 1558,
+    "n_val": 286,
+    "best_epoch": 25,
+    "epochs_run": 50,
+    "best_validation_metric": 3.616502437680423,
+    "epoch_numbering": "one_based",
+    "n_train_samples": 1558,
+    "n_train_batches": 13,
+    "effective_drop_last": false,
+    "parameter_counts": {
+      "total": 4536401,
+      "trainable": 4536401,
+      "frozen": 0
+    },
+    "model": "cnn",
+    "experiment": "cnn_deep_wide",
+    "high_encoder": "scratch_cnn_48_96_192_384",
+    "wide": true,
+    "high_encoder_channels": [
+      48,
+      96,
+      192,
+      384
+    ],
+    "convs_per_block": 3,
+    "high_encoder_feature_dim": 384,
+    "lr": 0.0003,
+    "total_model_parameters": 4536401,
+    "trainable_high_encoder_parameters": 4406832,
+    "trainable_non_high_encoder_parameters": 129569,
+    "pm25": {
+      "rmse": 3.616502437680423,
+      "mae": 2.7484645245205064,
+      "r2": 0.28653946222703397,
+      "n": 286,
+      "baseline": 5.051499845035198,
+      "baseline_concentration": 10.630579511807708,
+      "baseline_metrics": {
+        "rmse": 5.051499845035198,
+        "mae": 3.870999700312449,
+        "r2": -0.391980401102598,
+        "n": 286
+      }
+    },
+    "buffer_km": 100.0,
+    "buffer_removed_train_stations": 25,
+    "n_train_before_buffer": 1583
+  },
+  "fold4_alpine": {
+    "n_train": 1466,
+    "n_val": 253,
+    "best_epoch": 25,
+    "epochs_run": 50,
+    "best_validation_metric": 1.8183469422558884,
+    "epoch_numbering": "one_based",
+    "n_train_samples": 1466,
+    "n_train_batches": 12,
+    "effective_drop_last": false,
+    "parameter_counts": {
+      "total": 4536401,
+      "trainable": 4536401,
+      "frozen": 0
+    },
+    "model": "cnn",
+    "experiment": "cnn_deep_wide",
+    "high_encoder": "scratch_cnn_48_96_192_384",
+    "wide": true,
+    "high_encoder_channels": [
+      48,
+      96,
+      192,
+      384
+    ],
+    "convs_per_block": 3,
+    "high_encoder_feature_dim": 384,
+    "lr": 0.0003,
+    "total_model_parameters": 4536401,
+    "trainable_high_encoder_parameters": 4406832,
+    "trainable_non_high_encoder_parameters": 129569,
+    "pm25": {
+      "rmse": 1.8183469422558884,
+      "mae": 1.338113706206906,
+      "r2": -0.036484039753787556,
+      "n": 253,
+      "baseline": 3.3768510166887133,
+      "baseline_concentration": 11.42820302489163,
+      "baseline_metrics": {
+        "rmse": 3.3768510166887133,
+        "mae": 3.001605328378887,
+        "r2": -2.574644996952032,
+        "n": 253
+      }
+    },
+    "buffer_km": 100.0,
+    "buffer_removed_train_stations": 150,
+    "n_train_before_buffer": 1616
+  },
+  "fold5_north": {
+    "n_train": 1672,
+    "n_val": 197,
+    "best_epoch": 20,
+    "epochs_run": 45,
+    "best_validation_metric": 3.378271168776088,
+    "epoch_numbering": "one_based",
+    "n_train_samples": 1672,
+    "n_train_batches": 14,
+    "effective_drop_last": false,
+    "parameter_counts": {
+      "total": 4536401,
+      "trainable": 4536401,
+      "frozen": 0
+    },
+    "model": "cnn",
+    "experiment": "cnn_deep_wide",
+    "high_encoder": "scratch_cnn_48_96_192_384",
+    "wide": true,
+    "high_encoder_channels": [
+      48,
+      96,
+      192,
+      384
+    ],
+    "convs_per_block": 3,
+    "high_encoder_feature_dim": 384,
+    "lr": 0.0003,
+    "total_model_parameters": 4536401,
+    "trainable_high_encoder_parameters": 4406832,
+    "trainable_non_high_encoder_parameters": 129569,
+    "pm25": {
+      "rmse": 3.378271168776088,
+      "mae": 2.8566857796443985,
+      "r2": -1.5188007700623283,
+      "n": 197,
+      "baseline": 5.270858973639683,
+      "baseline_concentration": 11.539956415686719,
+      "baseline_metrics": {
+        "rmse": 5.270858973639683,
+        "mae": 4.867978499582019,
+        "r2": -5.131512146130206,
+        "n": 197
+      }
+    },
+    "buffer_km": 100.0,
+    "buffer_removed_train_stations": 0,
+    "n_train_before_buffer": 1672
+  },
+  "fold6_balkan_e": {
+    "n_train": 1658,
+    "n_val": 146,
+    "best_epoch": 42,
+    "epochs_run": 67,
+    "best_validation_metric": 6.318454634750708,
+    "epoch_numbering": "one_based",
+    "n_train_samples": 1658,
+    "n_train_batches": 13,
+    "effective_drop_last": false,
+    "parameter_counts": {
+      "total": 4536401,
+      "trainable": 4536401,
+      "frozen": 0
+    },
+    "model": "cnn",
+    "experiment": "cnn_deep_wide",
+    "high_encoder": "scratch_cnn_48_96_192_384",
+    "wide": true,
+    "high_encoder_channels": [
+      48,
+      96,
+      192,
+      384
+    ],
+    "convs_per_block": 3,
+    "high_encoder_feature_dim": 384,
+    "lr": 0.0003,
+    "total_model_parameters": 4536401,
+    "trainable_high_encoder_parameters": 4406832,
+    "trainable_non_high_encoder_parameters": 129569,
+    "pm25": {
+      "rmse": 6.318454634750708,
+      "mae": 4.246993123670474,
+      "r2": -0.04674097647604514,
+      "n": 146,
+      "baseline": 8.296847586740398,
+      "baseline_concentration": 10.43087610847783,
+      "baseline_metrics": {
+        "rmse": 8.296847586740398,
+        "mae": 6.117667552518946,
+        "r2": -0.8048607879217817,
+        "n": 146
+      }
+    },
+    "buffer_km": 100.0,
+    "buffer_removed_train_stations": 65,
+    "n_train_before_buffer": 1723
+  },
+  "fold7_balkan_s": {
+    "n_train": 1713,
+    "n_val": 144,
+    "best_epoch": 34,
+    "epochs_run": 59,
+    "best_validation_metric": 6.575727886825703,
+    "epoch_numbering": "one_based",
+    "n_train_samples": 1713,
+    "n_train_batches": 14,
+    "effective_drop_last": false,
+    "parameter_counts": {
+      "total": 4536401,
+      "trainable": 4536401,
+      "frozen": 0
+    },
+    "model": "cnn",
+    "experiment": "cnn_deep_wide",
+    "high_encoder": "scratch_cnn_48_96_192_384",
+    "wide": true,
+    "high_encoder_channels": [
+      48,
+      96,
+      192,
+      384
+    ],
+    "convs_per_block": 3,
+    "high_encoder_feature_dim": 384,
+    "lr": 0.0003,
+    "total_model_parameters": 4536401,
+    "trainable_high_encoder_parameters": 4406832,
+    "trainable_non_high_encoder_parameters": 129569,
+    "pm25": {
+      "rmse": 6.575727886825703,
+      "mae": 5.040481766428956,
+      "r2": 0.011931595454643174,
+      "n": 144,
+      "baseline": 9.399567815060905,
+      "baseline_concentration": 10.499970073433039,
+      "baseline_metrics": {
+        "rmse": 9.399567815060905,
+        "mae": 7.465852159047649,
+        "r2": -1.0189014407316908,
+        "n": 144
+      }
+    },
+    "buffer_km": 100.0,
+    "buffer_removed_train_stations": 12,
+    "n_train_before_buffer": 1725
+  },
+  "fold8_poland": {
+    "n_train": 1538,
+    "n_val": 277,
+    "best_epoch": 22,
+    "epochs_run": 47,
+    "best_validation_metric": 4.220945264872737,
+    "epoch_numbering": "one_based",
+    "n_train_samples": 1538,
+    "n_train_batches": 13,
+    "effective_drop_last": false,
+    "parameter_counts": {
+      "total": 4536401,
+      "trainable": 4536401,
+      "frozen": 0
+    },
+    "model": "cnn",
+    "experiment": "cnn_deep_wide",
+    "high_encoder": "scratch_cnn_48_96_192_384",
+    "wide": true,
+    "high_encoder_channels": [
+      48,
+      96,
+      192,
+      384
+    ],
+    "convs_per_block": 3,
+    "high_encoder_feature_dim": 384,
+    "lr": 0.0003,
+    "total_model_parameters": 4536401,
+    "trainable_high_encoder_parameters": 4406832,
+    "trainable_non_high_encoder_parameters": 129569,
+    "pm25": {
+      "rmse": 4.220945264872737,
+      "mae": 3.3931693677981194,
+      "r2": -1.0075743068742957,
+      "n": 277,
+      "baseline": 4.729557166067676,
+      "baseline_concentration": 10.497541566911718,
+      "baseline_metrics": {
+        "rmse": 4.729557166067676,
+        "mae": 3.9761035626180097,
+        "r2": -1.5205373861113802,
+        "n": 277
+      }
+    },
+    "buffer_km": 100.0,
+    "buffer_removed_train_stations": 54,
+    "n_train_before_buffer": 1592
+  },
+  "pooled_out_of_fold": {
+    "pm25": {
+      "rmse": 3.745917800922522,
+      "mae": 2.6038953094184114,
+      "r2": 0.440439745883756,
+      "n": 1869
+    }
+  },
+  "_config": {
+    "batch": 128,
+    "num_workers": 0,
+    "cache_patches": true,
+    "s5p_streams": [
+      "no2",
+      "co"
+    ],
+    "use_aer_wide": true,
+    "use_dem": true,
+    "tta": true,
+    "buffer_km": 100.0,
+    "max_pm10": 120.0,
+    "max_pm25": 80.0,
+    "pollutants": [
+      "pm25"
+    ],
+    "model": "cnn",
+    "experiment": "cnn_deep_wide",
+    "wide": true,
+    "high_channels": [
+      48,
+      96,
+      192,
+      384
+    ],
+    "convs_per_block": 3,
+    "lr": 0.0003,
+    "weight_decay": 1e-07,
+    "proj_dim": 64,
+    "dropout": 0.5,
+    "low_cnn_ch1": 32,
+    "low_cnn_ch2": 128,
+    "s5p_cnn_hidden": 32,
+    "head_hidden": 64,
+    "wide_feat": 32,
+    "dem_feat": 32,
+    "epochs": 500,
+    "patience": 25
+  }
+}

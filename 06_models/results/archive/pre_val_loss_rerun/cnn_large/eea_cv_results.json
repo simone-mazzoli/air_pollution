@@ -1,0 +1,94 @@
+{
+  "fold1_iberia": {
+    "n_train": 1662,
+    "n_val": 204,
+    "best_epoch": 41,
+    "epochs_run": 66,
+    "best_validation_metric": 2.5877726951648663,
+    "epoch_numbering": "one_based",
+    "n_train_samples": 1662,
+    "n_train_batches": 13,
+    "effective_drop_last": false,
+    "parameter_counts": {
+      "total": 2771681,
+      "trainable": 2771681,
+      "frozen": 0
+    },
+    "model": "cnn",
+    "experiment": "cnn_large",
+    "high_encoder": "scratch_cnn_48_96_192_384",
+    "high_encoder_channels": [
+      48,
+      96,
+      192,
+      384
+    ],
+    "high_encoder_feature_dim": 384,
+    "lr": 0.0003,
+    "trainable_high_encoder_parameters": 2642112,
+    "trainable_non_high_encoder_parameters": 129569,
+    "pm25": {
+      "rmse": 2.5877726951648663,
+      "mae": 1.944687384688546,
+      "r2": -0.010874764893995525,
+      "n": 204,
+      "baseline": 4.199973338549879,
+      "baseline_concentration": 11.398050627024533,
+      "baseline_metrics": {
+        "rmse": 4.199973338549879,
+        "mae": 3.6225221374762793,
+        "r2": -1.6627976873601007,
+        "n": 204
+      }
+    },
+    "buffer_km": 100.0,
+    "buffer_removed_train_stations": 3,
+    "n_train_before_buffer": 1665
+  },
+  "pooled_out_of_fold": {
+    "pm25": {
+      "rmse": 2.5877726951648663,
+      "mae": 1.944687384688546,
+      "r2": -0.010874764893995525,
+      "n": 204
+    }
+  },
+  "_config": {
+    "batch": 128,
+    "num_workers": 0,
+    "cache_patches": true,
+    "s5p_streams": [
+      "no2",
+      "co"
+    ],
+    "use_aer_wide": true,
+    "use_dem": true,
+    "tta": true,
+    "buffer_km": 100.0,
+    "max_pm10": 120.0,
+    "max_pm25": 80.0,
+    "pollutants": [
+      "pm25"
+    ],
+    "model": "cnn",
+    "experiment": "cnn_large",
+    "high_channels": [
+      48,
+      96,
+      192,
+      384
+    ],
+    "lr": 0.0003,
+    "weight_decay": 1e-07,
+    "proj_dim": 64,
+    "dropout": 0.5,
+    "low_cnn_ch1": 32,
+    "low_cnn_ch2": 128,
+    "s5p_cnn_hidden": 32,
+    "head_hidden": 64,
+    "wide_feat": 32,
+    "dem_feat": 32,
+    "epochs": 500,
+    "patience": 25
+  }
+}

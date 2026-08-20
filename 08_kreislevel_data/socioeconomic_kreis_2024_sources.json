@@ -1,0 +1,170 @@
+{
+  "generated_utc": "2026-08-18T15:24:42.887982+00:00",
+  "output": "08_kreislevel_data/socioeconomic_kreis_2024.csv",
+  "geography": {
+    "reference": "2024 NUTS3-backed Kreis geography",
+    "n_rows": 400,
+    "expected_n_rows": 400,
+    "crosswalk": "data/raw/socioeconomic_auto/bkg/vg250-ew_12-31.utm32s.gpkg.ebenen.zip",
+    "note": "AGS/NUTS/name comes from the existing project boundary GeoJSON when available, otherwise from the official BKG VG250-EW 31.12.2024 Excel archive. The final base is restricted to NUTS3 codes present in Eurostat 2024 population data."
+  },
+  "analysis_notes": {
+    "mortality": "Not included in the primary table by design.",
+    "material_deprivation": "Not included by design.",
+    "migration": "Immigration history / nationality are demographic characteristics, not SES-disadvantage proxies.",
+    "population_density": "Intended mainly as an urbanicity/structural control.",
+    "mixed_reference_years": "The true reference year is encoded in every column name. Zensus 2022 and VGRdL 2023 indicators are not relabeled 2024."
+  },
+  "sources": [
+    {
+      "variable": "population_2024",
+      "source": "Eurostat",
+      "reference_year": 2024,
+      "source_id_or_url": "demo_r_pjanaggr3",
+      "cached_file": "data/raw/socioeconomic_auto/eurostat/demo_r_pjanaggr3_2024.json",
+      "n_available": 400,
+      "n_total": 400,
+      "note": ""
+    },
+    {
+      "variable": "population_under15_2024",
+      "source": "Eurostat",
+      "reference_year": 2024,
+      "source_id_or_url": "demo_r_pjanaggr3",
+      "cached_file": "data/raw/socioeconomic_auto/eurostat/demo_r_pjanaggr3_2024.json",
+      "n_available": 400,
+      "n_total": 400,
+      "note": ""
+    },
+    {
+      "variable": "population_15_64_2024",
+      "source": "Eurostat",
+      "reference_year": 2024,
+      "source_id_or_url": "demo_r_pjanaggr3",
+      "cached_file": "data/raw/socioeconomic_auto/eurostat/demo_r_pjanaggr3_2024.json",
+      "n_available": 400,
+      "n_total": 400,
+      "note": ""
+    },
+    {
+      "variable": "population_65plus_2024",
+      "source": "Eurostat",
+      "reference_year": 2024,
+      "source_id_or_url": "demo_r_pjanaggr3",
+      "cached_file": "data/raw/socioeconomic_auto/eurostat/demo_r_pjanaggr3_2024.json",
+      "n_available": 400,
+      "n_total": 400,
+      "note": ""
+    },
+    {
+      "variable": "share_under15_2024_pct",
+      "source": "Eurostat",
+      "reference_year": 2024,
+      "source_id_or_url": "demo_r_pjanaggr3",
+      "cached_file": "data/raw/socioeconomic_auto/eurostat/demo_r_pjanaggr3_2024.json",
+      "n_available": 400,
+      "n_total": 400,
+      "note": ""
+    },
+    {
+      "variable": "share_15_64_2024_pct",
+      "source": "Eurostat",
+      "reference_year": 2024,
+      "source_id_or_url": "demo_r_pjanaggr3",
+      "cached_file": "data/raw/socioeconomic_auto/eurostat/demo_r_pjanaggr3_2024.json",
+      "n_available": 400,
+      "n_total": 400,
+      "note": ""
+    },
+    {
+      "variable": "share_65plus_2024_pct",
+      "source": "Eurostat",
+      "reference_year": 2024,
+      "source_id_or_url": "demo_r_pjanaggr3",
+      "cached_file": "data/raw/socioeconomic_auto/eurostat/demo_r_pjanaggr3_2024.json",
+      "n_available": 400,
+      "n_total": 400,
+      "note": ""
+    },
+    {
+      "variable": "median_age_2024",
+      "source": "Eurostat",
+      "reference_year": 2024,
+      "source_id_or_url": "demo_r_pjanind3",
+      "cached_file": "data/raw/socioeconomic_auto/eurostat/demo_r_pjanind3_2024.json",
+      "n_available": 400,
+      "n_total": 400,
+      "note": ""
+    },
+    {
+      "variable": "population_density_2024_per_km2",
+      "source": "Eurostat",
+      "reference_year": 2024,
+      "source_id_or_url": "demo_r_d3dens",
+      "cached_file": "data/raw/socioeconomic_auto/eurostat/demo_r_d3dens_2024.json",
+      "n_available": 400,
+      "n_total": 400,
+      "note": "Used primarily as an urbanicity/structural control, not as a socioeconomic disadvantage measure."
+    },
+    {
+      "variable": "unemployment_rate_2024_pct",
+      "source": "Bundesagentur fuer Arbeit",
+      "reference_year": 2024,
+      "source_id_or_url": "https://statistik.arbeitsagentur.de/Statistikdaten/Detail/Aktuell/iiia4/kreise-arbeitslosenquoten/arbeitslosenquoten-k-0-xlsx.xlsx",
+      "cached_file": "data/raw/socioeconomic_auto/ba/arbeitslosenquoten-k-0-xlsx.xlsx",
+      "n_available": 400,
+      "n_total": 400,
+      "note": ""
+    },
+    {
+      "variable": "disposable_income_2023_eur_per_capita",
+      "source": "VGRdL",
+      "reference_year": 2023,
+      "source_id_or_url": "https://www.statistikportal.de/sites/default/files/2026-01/vgrdl_r2b3_bs2024_0.xlsx",
+      "cached_file": "data/raw/socioeconomic_auto/vgrdl/vgrdl_r2b3_income_kreise.xlsx",
+      "n_available": 398,
+      "n_total": 400,
+      "note": "Disposable household income per inhabitant; 2023 is retained explicitly because Kreis-level VGRdL income currently lags the 2024 pollution/demographic reference year."
+    },
+    {
+      "variable": "immigration_history_2022_pct",
+      "source": "Zensus 2022 / Statistisches Bundesamt",
+      "reference_year": 2022,
+      "source_id_or_url": "https://www.destatis.de/static/DE/zensus/gitterdaten/Regionaltabelle_Demografie.xlsx",
+      "cached_file": "data/raw/socioeconomic_auto/zensus2022/regionaltabelle_demografie.xlsx",
+      "n_available": 400,
+      "n_total": 400,
+      "note": "Migration variables are demographic characteristics; they must not be interpreted as socioeconomic disadvantage by themselves."
+    },
+    {
+      "variable": "foreign_national_2022_pct",
+      "source": "Zensus 2022 / Statistisches Bundesamt",
+      "reference_year": 2022,
+      "source_id_or_url": "https://www.destatis.de/static/DE/zensus/gitterdaten/Regionaltabelle_Demografie.xlsx",
+      "cached_file": "data/raw/socioeconomic_auto/zensus2022/regionaltabelle_demografie.xlsx",
+      "n_available": 400,
+      "n_total": 400,
+      "note": "Migration variables are demographic characteristics; they must not be interpreted as socioeconomic disadvantage by themselves."
+    },
+    {
+      "variable": "no_vocational_qualification_2022_pct",
+      "source": "Zensus 2022 / Statistisches Bundesamt",
+      "reference_year": 2022,
+      "source_id_or_url": "https://www.destatis.de/static/DE/zensus/gitterdaten/Regionaltabelle_Bildung_Erwerbstaetigkeit.xlsx",
+      "cached_file": "data/raw/socioeconomic_auto/zensus2022/regionaltabelle_bildung.xlsx",
+      "n_available": 400,
+      "n_total": 400,
+      "note": ""
+    },
+    {
+      "variable": "university_degree_2022_pct",
+      "source": "Zensus 2022 / Statistisches Bundesamt",
+      "reference_year": 2022,
+      "source_id_or_url": "https://www.destatis.de/static/DE/zensus/gitterdaten/Regionaltabelle_Bildung_Erwerbstaetigkeit.xlsx",
+      "cached_file": "data/raw/socioeconomic_auto/zensus2022/regionaltabelle_bildung.xlsx",
+      "n_available": 400,
+      "n_total": 400,
+      "note": ""
+    }
+  ]
+}

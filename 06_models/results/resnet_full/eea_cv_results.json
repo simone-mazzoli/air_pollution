@@ -2,9 +2,9 @@
   "fold1_iberia": {
     "n_train": 1662,
     "n_val": 204,
-    "best_epoch": 16,
-    "epochs_run": 41,
-    "best_validation_metric": 3.045542387693153,
+    "best_epoch": 15,
+    "epochs_run": 40,
+    "best_validation_metric": 3.1042358299927026,
     "epoch_numbering": "one_based",
     "n_train_samples": 1662,
     "n_train_batches": 13,
@@ -22,9 +22,9 @@
     "trainable_backbone_parameters": 23476864,
     "trainable_non_backbone_parameters": 236065,
     "pm25": {
-      "rmse": 3.045542387693153,
-      "mae": 2.6042003914990333,
-      "r2": -0.4001494677240325,
+      "rmse": 3.1042358299927026,
+      "mae": 2.6515542752120016,
+      "r2": -0.4546366234420818,
       "n": 204,
       "baseline": 4.199973338549879,
       "baseline_concentration": 11.398050627024533,
@@ -41,9 +41,9 @@
   },
   "pooled_out_of_fold": {
     "pm25": {
-      "rmse": 3.045542387693153,
-      "mae": 2.6042003914990333,
-      "r2": -0.4001494677240325,
+      "rmse": 3.1042358299927026,
+      "mae": 2.6515542752120016,
+      "r2": -0.4546366234420818,
       "n": 204
     }
   },
