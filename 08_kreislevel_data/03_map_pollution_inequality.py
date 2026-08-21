@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Create a map series for the Kreis-level pollution + socioeconomic analysis.
 
@@ -20,7 +19,7 @@ Kreis geometry
 Outputs
 -------
 08_kreislevel_data/figures/pollution_inequality_maps/
-    01_mean_pm25.png
+    00_summary_maps.png  (combined 2x4 figure)\n    01_mean_pm25.png
     02_disposable_income.png
     03_unemployment.png
     04_no_vocational_qualification.png
@@ -388,20 +387,6 @@ def save_map(
     ax.set_title(spec["title"], pad=12)
     ax.set_axis_off()
 
-    n_available = int(available["AGS"].nunique())
-    n_covered = len(covered_ags)
-
-    ax.text(
-        0.01,
-        0.01,
-        f"Colored Kreise: {n_available}/{n_covered} in modeled grid coverage",
-        transform=ax.transAxes,
-        fontsize=8.5,
-        color="0.35",
-        ha="left",
-        va="bottom",
-    )
-
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=220, bbox_inches="tight")
@@ -409,6 +394,115 @@ def save_map(
 
     print(f"saved {out_path}")
 
+
+
+def save_summary_map_panel(
+    merged: gpd.GeoDataFrame,
+    covered_ags: set[str],
+    extent: tuple[float, float, float, float],
+    out_path: Path,
+) -> None:
+    """Save all eight maps together in one 2x4 summary figure."""
+    fig, axes = plt.subplots(
+        2,
+        4,
+        figsize=(18, 10.5),
+        squeeze=False,
+    )
+
+    xmin, xmax, ymin, ymax = extent
+
+    for ax, spec in zip(axes.ravel(), MAPS):
+        column = spec["column"]
+
+        covered = merged[merged["AGS"].isin(covered_ags)].copy()
+        available = covered[covered[column].notna()].copy()
+
+        if spec["log_scale"]:
+            available = available[available[column] > 0].copy()
+
+        if available.empty:
+            ax.axis("off")
+            ax.set_title(spec["title"])
+            continue
+
+        missing = covered[~covered["AGS"].isin(available["AGS"])].copy()
+        norm = make_norm(available[column], spec["log_scale"])
+
+        # Germany-wide context.
+        merged.plot(
+            ax=ax,
+            facecolor="0.92",
+            edgecolor="white",
+            linewidth=0.22,
+            zorder=1,
+        )
+
+        # Covered Kreise missing this particular indicator.
+        if not missing.empty:
+            missing.plot(
+                ax=ax,
+                facecolor="0.78",
+                edgecolor="white",
+                linewidth=0.28,
+                zorder=2,
+            )
+
+        # Mapped values for the modeled analysis area.
+        available.plot(
+            ax=ax,
+            column=column,
+            cmap=spec["cmap"],
+            norm=norm,
+            edgecolor="white",
+            linewidth=0.28,
+            zorder=3,
+        )
+
+        ax.set_xlim(xmin, xmax)
+        ax.set_ylim(ymin, ymax)
+        ax.set_axis_off()
+        ax.set_title(spec["title"], fontsize=10.5, pad=5)
+
+        sm = ScalarMappable(norm=norm, cmap=spec["cmap"])
+        sm.set_array([])
+
+        cbar = fig.colorbar(
+            sm,
+            ax=ax,
+            orientation="horizontal",
+            fraction=0.045,
+            pad=0.025,
+            shrink=0.88,
+            aspect=22,
+        )
+        cbar.ax.tick_params(labelsize=7)
+        cbar.set_label(spec["legend"], fontsize=7.5)
+
+    fig.suptitle(
+        "Predicted PM2.5 and socioeconomic characteristics across covered Kreise",
+        fontsize=15,
+        y=0.995,
+    )
+
+    fig.subplots_adjust(
+        left=0.025,
+        right=0.985,
+        top=0.94,
+        bottom=0.045,
+        wspace=0.10,
+        hspace=0.18,
+    )
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(
+        out_path,
+        dpi=240,
+        bbox_inches="tight",
+    )
+    plt.close(fig)
+
+    print(f"saved {out_path}")
 
 def main() -> None:
     args = parse_args()
@@ -447,6 +541,13 @@ def main() -> None:
             extent=extent,
             out_path=args.outdir / spec["filename"],
         )
+
+    save_summary_map_panel(
+        merged=merged,
+        covered_ags=covered_ags,
+        extent=extent,
+        out_path=args.outdir / "00_summary_maps.png",
+    )
 
     print("\nDone.")
 
