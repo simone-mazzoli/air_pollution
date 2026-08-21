@@ -72,18 +72,66 @@ def best_epochs_from_fold_results(path):
     df = pd.read_csv(path)
     if not {"fold", "best_epoch"}.issubset(df.columns):
         return {}
-    return {row["fold"]: int(row["best_epoch"]) for _, row in df.drop_duplicates("fold").iterrows()}
+    return {
+        row["fold"]: int(row["best_epoch"])
+        for _, row in df.drop_duplicates("fold").iterrows()
+    }
 
 
 def cv_status(history):
     have = set(history["fold"].dropna().unique())
-    return "complete 8-fold CV" if have == set(EXPECTED_FOLDS) else f"partial/diagnostic ({len(have)}/8 folds)"
+    return (
+        "complete 8-fold CV"
+        if have == set(EXPECTED_FOLDS)
+        else f"partial/diagnostic ({len(have)}/8 folds)"
+    )
+
+
+def ordered_folds(history):
+    folds = [f for f in EXPECTED_FOLDS if f in set(history["fold"])]
+    folds += sorted(set(history["fold"]) - set(folds))
+    return folds
+
+
+def common_ylim(history, columns, padding_fraction=0.05):
+    """
+    Compute one shared y-axis range from the complete history of one experiment.
+
+    Pass the returned limits to every per-fold plot so all folds of that model
+    use the same vertical scale.
+    """
+    columns = [c for c in columns if c and c in history.columns]
+    if not columns:
+        return None
+
+    values = history[columns].apply(pd.to_numeric, errors="coerce")
+    ymin = values.min().min()
+    ymax = values.max().max()
+
+    if pd.isna(ymin) or pd.isna(ymax):
+        return None
+
+    ymin = float(ymin)
+    ymax = float(ymax)
+
+    if ymax == ymin:
+        pad = 0.05 * abs(ymax) if ymax != 0 else 0.05
+    else:
+        pad = padding_fraction * (ymax - ymin)
+
+    return max(0.0, ymin - pad), ymax + pad
 
 
 def _mark_best_epoch(ax, history, best_epoch, y_col=None, label=True):
     if best_epoch is None:
         return
-    ax.axvline(best_epoch, color="black", linestyle="--", linewidth=1.0, alpha=0.75)
+    ax.axvline(
+        best_epoch,
+        color="black",
+        linestyle="--",
+        linewidth=1.0,
+        alpha=0.75,
+    )
     if y_col and best_epoch in set(history["epoch"]):
         ax.scatter(
             [best_epoch],
@@ -95,14 +143,32 @@ def _mark_best_epoch(ax, history, best_epoch, y_col=None, label=True):
         )
 
 
-def save_objective_loss_curve(history, out_path, title, best_epoch=None):
-    best_epoch = best_epoch if best_epoch is not None else best_epoch_from_history(history)
+def save_objective_loss_curve(history, out_path, title, best_epoch=None, ylim=None):
+    best_epoch = (
+        best_epoch if best_epoch is not None else best_epoch_from_history(history)
+    )
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     fig, ax = plt.subplots(figsize=(7.2, 4.5))
-    ax.plot(history["epoch"], history["train_loss"], color="#1f77b4", linewidth=1.8, label="train loss")
+    ax.plot(
+        history["epoch"],
+        history["train_loss"],
+        color="#1f77b4",
+        linewidth=1.8,
+        label="train loss",
+    )
     if "val_loss" in history.columns:
-        ax.plot(history["epoch"], history["val_loss"], color="#9467bd", linewidth=1.8, label="validation loss")
+        ax.plot(
+            history["epoch"],
+            history["val_loss"],
+            color="#9467bd",
+            linewidth=1.8,
+            label="validation loss",
+        )
+
+    if ylim is not None:
+        ax.set_ylim(*ylim)
+
     _mark_best_epoch(ax, history, best_epoch)
     ax.set_title(title)
     ax.set_xlabel("epoch")
@@ -114,16 +180,35 @@ def save_objective_loss_curve(history, out_path, title, best_epoch=None):
     plt.close(fig)
 
 
-def save_performance_curve(history, out_path, title, best_epoch=None):
+def save_performance_curve(history, out_path, title, best_epoch=None, ylim=None):
     rmse_col = validation_rmse_column(history)
     mae_col = validation_mae_column(history)
-    best_epoch = best_epoch if best_epoch is not None else best_epoch_from_history(history)
+    best_epoch = (
+        best_epoch if best_epoch is not None else best_epoch_from_history(history)
+    )
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     fig, ax = plt.subplots(figsize=(7.2, 4.5))
-    ax.plot(history["epoch"], history[rmse_col], color="#d62728", linewidth=1.8, label="validation RMSE")
+    ax.plot(
+        history["epoch"],
+        history[rmse_col],
+        color="#d62728",
+        linewidth=1.8,
+        label="validation RMSE",
+    )
     if mae_col:
-        ax.plot(history["epoch"], history[mae_col], color="#ff7f0e", linewidth=1.4, alpha=0.9, label="validation MAE")
+        ax.plot(
+            history["epoch"],
+            history[mae_col],
+            color="#ff7f0e",
+            linewidth=1.4,
+            alpha=0.9,
+            label="validation MAE",
+        )
+
+    if ylim is not None:
+        ax.set_ylim(*ylim)
+
     _mark_best_epoch(ax, history, best_epoch, rmse_col)
     ax.set_title(title)
     ax.set_xlabel("epoch")
@@ -135,56 +220,255 @@ def save_performance_curve(history, out_path, title, best_epoch=None):
     plt.close(fig)
 
 
-def save_run_curve(history, out_path, title, best_epoch=None):
+def save_run_curve(
+    history,
+    out_path,
+    title,
+    best_epoch=None,
+    objective_ylim=None,
+    performance_ylim=None,
+):
     fig, axes = plt.subplots(2, 1, figsize=(7.2, 6.0), sharex=True)
-    best_epoch = best_epoch if best_epoch is not None else best_epoch_from_history(history)
+    best_epoch = (
+        best_epoch if best_epoch is not None else best_epoch_from_history(history)
+    )
     rmse_col = validation_rmse_column(history)
     mae_col = validation_mae_column(history)
-    axes[0].plot(history["epoch"], history["train_loss"], color="#1f77b4", linewidth=1.8, label="train loss")
+
+    axes[0].plot(
+        history["epoch"],
+        history["train_loss"],
+        color="#1f77b4",
+        linewidth=1.8,
+        label="train loss",
+    )
     if "val_loss" in history.columns:
-        axes[0].plot(history["epoch"], history["val_loss"], color="#9467bd", linewidth=1.8, label="validation loss")
+        axes[0].plot(
+            history["epoch"],
+            history["val_loss"],
+            color="#9467bd",
+            linewidth=1.8,
+            label="validation loss",
+        )
+    if objective_ylim is not None:
+        axes[0].set_ylim(*objective_ylim)
+
     _mark_best_epoch(axes[0], history, best_epoch, label=False)
     axes[0].set_ylabel("SmoothL1 objective loss")
     axes[0].set_title(title)
     axes[0].grid(True, alpha=0.25)
     axes[0].legend(frameon=False)
 
-    axes[1].plot(history["epoch"], history[rmse_col], color="#d62728", linewidth=1.8, label="validation RMSE")
+    axes[1].plot(
+        history["epoch"],
+        history[rmse_col],
+        color="#d62728",
+        linewidth=1.8,
+        label="validation RMSE",
+    )
     if mae_col:
-        axes[1].plot(history["epoch"], history[mae_col], color="#ff7f0e", linewidth=1.2, alpha=0.8, label="validation MAE")
+        axes[1].plot(
+            history["epoch"],
+            history[mae_col],
+            color="#ff7f0e",
+            linewidth=1.2,
+            alpha=0.8,
+            label="validation MAE",
+        )
+    if performance_ylim is not None:
+        axes[1].set_ylim(*performance_ylim)
+
     _mark_best_epoch(axes[1], history, best_epoch, rmse_col)
     axes[1].set_xlabel("epoch")
     axes[1].set_ylabel("validation error [ug/m3]")
     axes[1].grid(True, alpha=0.25)
     axes[1].legend(frameon=False)
+
     fig.tight_layout()
     fig.savefig(out_path, dpi=200)
     plt.close(fig)
 
 
-def save_summary_grid(history, out_path, experiment_name, status, best_epochs=None):
-    rmse_col = validation_rmse_column(history)
+def save_objective_summary_grid(
+    history,
+    out_path,
+    experiment_name,
+    status,
+    best_epochs=None,
+    ylim=None,
+):
+    """Save an all-fold summary of train and validation objective loss."""
     best_epochs = best_epochs or {}
-    folds = [f for f in EXPECTED_FOLDS if f in set(history["fold"])]
-    folds += sorted(set(history["fold"]) - set(folds))
+    folds = ordered_folds(history)
     if not folds:
         return
+
     out_path.parent.mkdir(parents=True, exist_ok=True)
     ncols, nrows = 4, (len(folds) + 3) // 4
-    fig, axes = plt.subplots(nrows, ncols, figsize=(13.5, 3.0 * nrows), squeeze=False)
-    for ax, fold in zip(axes.ravel(), folds):
-        sub = history[history["fold"] == fold]
-        ax.plot(sub["epoch"], sub[rmse_col], color="#d62728", linewidth=1.5)
+
+    fig, axes = plt.subplots(
+        nrows,
+        ncols,
+        figsize=(13.5, 3.0 * nrows),
+        squeeze=False,
+        sharex=True,
+        sharey=True,
+    )
+
+    legend_handles = None
+    legend_labels = None
+
+    for idx, (ax, fold) in enumerate(zip(axes.ravel(), folds)):
+        sub = history[history["fold"] == fold].sort_values("epoch")
+
+        ax.plot(
+            sub["epoch"],
+            sub["train_loss"],
+            color="#1f77b4",
+            linewidth=1.5,
+            label="train loss",
+        )
+        if "val_loss" in sub.columns:
+            ax.plot(
+                sub["epoch"],
+                sub["val_loss"],
+                color="#9467bd",
+                linewidth=1.5,
+                label="validation loss",
+            )
+
+        if ylim is not None:
+            ax.set_ylim(*ylim)
+
         best_epoch = best_epochs.get(fold, best_epoch_from_history(sub))
         if best_epoch is not None:
-            ax.axvline(best_epoch, color="black", linestyle="--", linewidth=0.9, alpha=0.75)
+            ax.axvline(
+                best_epoch,
+                color="black",
+                linestyle="--",
+                linewidth=0.9,
+                alpha=0.75,
+            )
+
+        if idx == 0:
+            legend_handles, legend_labels = ax.get_legend_handles_labels()
+
         ax.set_title(FOLD_LABELS.get(fold, fold))
         ax.set_xlabel("epoch")
-        ax.set_ylabel("RMSE [ug/m3]")
+        ax.set_ylabel("SmoothL1 objective loss")
         ax.grid(True, alpha=0.25)
+
     for ax in axes.ravel()[len(folds):]:
         ax.axis("off")
-    fig.suptitle(f"{experiment_name}: validation RMSE by fold ({status})", y=1.02)
+
+    if legend_handles:
+        fig.legend(
+            legend_handles,
+            legend_labels,
+            loc="upper center",
+            ncol=len(legend_labels),
+            frameon=False,
+            bbox_to_anchor=(0.5, 1.02),
+        )
+
+    fig.suptitle(
+        f"{experiment_name}: objective loss by fold ({status})",
+        y=1.08,
+    )
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def save_performance_summary_grid(
+    history,
+    out_path,
+    experiment_name,
+    status,
+    best_epochs=None,
+    ylim=None,
+):
+    """Save an all-fold summary of validation RMSE and MAE."""
+    rmse_col = validation_rmse_column(history)
+    mae_col = validation_mae_column(history)
+    best_epochs = best_epochs or {}
+    folds = ordered_folds(history)
+    if not folds:
+        return
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    ncols, nrows = 4, (len(folds) + 3) // 4
+
+    fig, axes = plt.subplots(
+        nrows,
+        ncols,
+        figsize=(13.5, 3.0 * nrows),
+        squeeze=False,
+        sharex=True,
+        sharey=True,
+    )
+
+    legend_handles = None
+    legend_labels = None
+
+    for idx, (ax, fold) in enumerate(zip(axes.ravel(), folds)):
+        sub = history[history["fold"] == fold].sort_values("epoch")
+
+        ax.plot(
+            sub["epoch"],
+            sub[rmse_col],
+            color="#d62728",
+            linewidth=1.5,
+            label="validation RMSE",
+        )
+        if mae_col:
+            ax.plot(
+                sub["epoch"],
+                sub[mae_col],
+                color="#ff7f0e",
+                linewidth=1.2,
+                alpha=0.85,
+                label="validation MAE",
+            )
+
+        if ylim is not None:
+            ax.set_ylim(*ylim)
+
+        best_epoch = best_epochs.get(fold, best_epoch_from_history(sub))
+        if best_epoch is not None:
+            ax.axvline(
+                best_epoch,
+                color="black",
+                linestyle="--",
+                linewidth=0.9,
+                alpha=0.75,
+            )
+
+        if idx == 0:
+            legend_handles, legend_labels = ax.get_legend_handles_labels()
+
+        ax.set_title(FOLD_LABELS.get(fold, fold))
+        ax.set_xlabel("epoch")
+        ax.set_ylabel("validation error [ug/m3]")
+        ax.grid(True, alpha=0.25)
+
+    for ax in axes.ravel()[len(folds):]:
+        ax.axis("off")
+
+    if legend_handles:
+        fig.legend(
+            legend_handles,
+            legend_labels,
+            loc="upper center",
+            ncol=len(legend_labels),
+            frameon=False,
+            bbox_to_anchor=(0.5, 1.02),
+        )
+
+    fig.suptitle(
+        f"{experiment_name}: validation RMSE/MAE by fold ({status})",
+        y=1.08,
+    )
     fig.tight_layout()
     fig.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
