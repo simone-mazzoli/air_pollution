@@ -1,0 +1,874 @@
+\documentclass[english, a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{lmodern}
+\usepackage[top=1.7cm, right=1.8cm, bottom=1.8cm, left=1.8cm, head=14pt]{geometry}
+\usepackage{calc}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage[official]{eurosym}
+\usepackage{lastpage}
+\usepackage{subcaption}
+\usepackage{etoolbox}
+\usepackage{amssymb}
+\usepackage{enumitem}
+\usepackage{natbib}
+\usepackage{siunitx}
+\usepackage[hang,flushmargin]{footmisc}
+\usepackage{float} % for [H] figure placement
+\usepackage[export]{adjustbox}
+
+% spacing
+\usepackage{caption}
+\captionsetup{font=small}
+
+\captionsetup[figure]{skip=5pt}
+\captionsetup[subfigure]{font=scriptsize, skip=1pt}
+\captionsetup[table]{skip=6pt}
+
+\setlength{\textfloatsep}{9pt plus 1pt minus 2pt}
+\setlength{\floatsep}{6pt plus 1pt minus 2pt}
+\setlength{\intextsep}{8pt plus 1pt minus 2pt}
+\setlength{\abovecaptionskip}{3pt}
+\setlength{\belowcaptionskip}{0pt}
+
+\bibliographystyle{plainnat}
+
+% TikZ setup
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes, calc, fit}
+
+% Line spacing
+\usepackage{setspace}
+\setstretch{1.15}
+
+% Page header
+\usepackage[automark]{scrlayer-scrpage}
+\pagestyle{scrheadings}
+\clearpairofpagestyles
+\ihead{}
+\chead{}
+\ohead{\pagemark}
+
+% Hyperref (should come last)
+\usepackage[
+  colorlinks=false,
+  pdfborder={0 0 0}
+]{hyperref}
+
+
+% \setlength{\parindent}{0pt}
+\usepackage{parskip}
+\usepackage{wrapfig}
+
+%-------------- Ende allgemeine Angaben -----------------------------
+\begin{document}
+
+%-------------- Beginn Titelseite -----------------------------------
+\hypersetup{pageanchor=false}
+\thispagestyle{empty}
+\noindent \hfill \includegraphics[height=2.4cm, trim=1.2cm 1.2cm 1.2cm 1.2cm]{Figures/UniKonstanz_Logo_Optimum_sRGB.jpg}
+
+\vspace{1cm}
+\begin{center}
+
+
+\vspace{5cm}
+
+
+
+\vspace{2cm}
+\begin{center}
+  {\Huge Deep Learning Project}
+\end{center}
+
+
+
+\vspace{3cm}
+Instructor: Giordano De Marzo \\
+Course: Deep Learning for Social Scientists Summer Semester 2026 \\
+\end{center}
+
+\vspace{5cm}
+\begin{flushleft}
+{Lisanne Dolleman, Enrolment Number: 01/1594416} \\ 
+{David Marasek, Enrolment No: 01/923631} \\
+{Simone Mazzoli, Enrolment No: 01/1586813} \\ 
+{Aaron Siebert, Enrolment No: 01/1590814} \\
+
+{M.Sc. Social and Economic Data Science} \\
+
+\vspace{1cm}
+Handed in: \
+Konstanz, 31.08.2026\
+\end{flushleft}
+%-------------- Ende Titelseite -------------------------------------
+
+%------------------ Table of Contents
+\newpage
+\hypersetup{pageanchor=true}
+\pagenumbering{Roman}
+\renewcommand{\thepage}{\Roman{page}}
+\tableofcontents{}
+
+
+%------------------ Main Content
+\newpage
+\pagenumbering{arabic}
+\renewcommand{\thepage}{\arabic{page}}
+
+%------------------ Sections
+
+\begin{abstract}
+
+Despite the well-established consequences of air pollution for human health, accurately measuring its spatial distribution remains a challenge. Consequently, precise air monitoring is costly to report at scale. As a result, many regions are undercovered. This gap translates into disparities in the protection measures implemented. In this project, we offer an alternative method to estimate particulate matter (PM) 2.5 using publicly available satellite data. Both a from-scratch CNN and a ResNet50 pre-trained on BigEarthNet are deployed and compared. Additionally, we test the reliability of low-cost PM sensors and compare them to stations of the  European Environmental Agency (EEA) for reference. Finally, the best-performing model is used to create a dense continuous map of PM 2.5 in North-Eastern Germany, which we use to examine social disparities in pollution exposure across the region. 
+
+We find that low-cost sensors are unreliable, even after calibration, and that the from-scratch model consistently achieves better results in the cross-validation arrangement. We argue that the ResNet-50 pretraining is not relevant for this specific task, and that the Sentinel-2 multispectral data modality may not be particularly relevant compared to the other modalities used.
+\end{abstract}
+
+\section{Introduction}
+
+Exposure to fine particulate matter (PM 2.5) is a well-established risk factor for cardiovascular and respiratory diseases, and has been associated with increased mortality rates at concentrations around the current regulatory thresholds in many countries (WHO air quality guidelines 2021). The estimation of PM in an area constitutes a fundamental step to introduce public health policies and targeted interventions.
+
+High-quality PM measurements are, however, costly to produce. Many regions in Europe are undercovered. This creates discrepancies and mistreatments in public intervention between extensively covered areas and sparsely covered ones. Such undercovered regions correlate with lower 
+income areas and lower population density, further marginalizing the already vulnerable communities.
+
+%verify correlation above mentioned in socioeconomic analysis
+
+Recent studies have examined the validity of low-cost sensors as a scalable yet imprecise alternative to high quality reference station measurements (Benabbas et al, 2019). The overall reliability is disputed. After analysing their validity, we argue that such sensors do not capture PM well enough to be used as labels for our models. We therefore rely on measurements from EEA reference stations to train and fine-tune models capable of predicting PM 2.5 from a wide range of satellite data modalities.
+
+
+%Problem definition: sparse data on air pollution 
+%   Why is air pollution a problem (relevance) 
+%   Why is sparsity in air pollution data a problem (relevance) 
+
+Our approach addresses the limited spatial coverage of conventional monitoring networks by using satellite data as model inputs. Unlike reference stations, publicly available satellite observations provide coverage across regions where precise ground-based PM measurements are unavailable, allowing the trained model to generate more spatially continuous estimates of PM 2.5. We apply this approach to North-Eastern Germany, which serves as the target region of this study.
+
+%How does the CNN approach resolve the problem 
+%   Possible references to the papers that giordano gave us, or other links to previous attempts of using CNNs to predict pollution 
+
+\subsection{Pipeline Overview}
+
+Figure 1 shows the pipeline overview. After downloading all necessary data, the first step is to evaluate the validity of low-cost sensors and determine whether they are suitable for use as labels in our models. in the final pipeline, we demonstrate their unreliability and therefore resort to EEA-wide reference station measurements.
+
+After that, we co-locate all satellite patches with their respective PM measurements at the given locations. Since we perform point estimation, PM2.5 is predicted at the center of each patch, where the corresponding monitoring station is located.
+
+
+The paired labels and patches are then used to train both models from scratch and fine-tuned ones. We show that the models trained from scratch systematically outperform the ResNet-50 models pretrained on BigEarthNet. Possible explanations include the relative dissimilarity between our task and the land-cover classification task used to pre-train the ResNet-50, as well as the characteristics of the satellite patches used for training.
+
+The best-performing model is then evaluated over North-Eastern Germany, and a continuous PM prediction map is generated. The characteristics and limitations of this map are discussed in the respective section.
+
+Finally, we perform a social disparity analysis.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.9\textwidth]{Figures/generated/pipeline_overview_compact.pdf}
+    \caption{Pipeline Overview.}
+    \label{fig:pipeline_overview}
+\end{figure}
+
+%introduction socio-economic analysis 
+%   references to previous pollution impact analyses 
+
+%possible visual with the pipeline, as a nice overview 
+
+The remainder of this report is as follows: Section 2 describes the collection and processing steps in detail. Section 3 is about the validation of the low-cost sensors. Section 4 focuses on the models' architecture. Section 5 presents the results. Section 6 analyses the relationship between predicted pollution exposure and social factors. Section 7 concludes.
+
+\section{Data Collection and Processing}
+
+In this section, we describe the data sources used in this project and the processing steps applied to produce valid, model-ready training data.
+
+We use three main categories of data: particulate matter (PM) measurements, satellite patches (including pollution covariates), and socioeconomic data. Figure 1 provides an overview of the different data types used. Unless otherwise specified, the data refer to the year 2024.
+
+%figure with overview of data types 
+
+\subsection{PM Data}
+
+We gather PM measurements that serve as labels for our models to train. Low-cost (LC) sensor measurements are gathered from Sensor.Community, while reference stations across Europe (EEA stations) are fetched using the EEA API. Sensor.Community is a non-profit organisation that collects data from private sensors. They supply information for how private actors can install a home sensor and collect the data from sensors connected to their network. They provide access to approximately ten thousand sensors globally. The EEA collects data from local and regional authorities and creates uniform datasets with environmental data across Europe. The Sensor.Community sensors are abundant and cover many areas not extensively covered by the EEA stations, while the latter provide high quality measurements to test the low cost sensors' validity.
+
+
+%preprocessing decisions 
+The EEA stations are filtered to keep only the stations that have valid values for at least 90\% of the days of 2024. Invalid values include missing or negative values, values that have been determined invalid by the stations themselves and those stations that do not have all the necessary satellite and covariate data. %how many stations are filtered out by this process.  
+The PM values are then averaged over the full year to create annual averages for each station. They are log-transformed and standardized based on the training set mean and standard deviation. Outliers above a value of 120 ug/m3 PM10 and 25 ug/m3 PM2.5 are removed.
+
+%resulting distributions 
+%   figure distribution of PM measures 
+%   facetted distribution of PM across the folds? 
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{Figures/generated/coverage_validation_geography.pdf}
+\caption{Reference-station coverage and geographic validation design.}
+\label{fig:sensor_map}
+\label{fig:fold_map}
+\end{figure}
+
+This results in the following geographical distribution of EEA reference stations. Figure~\ref{fig:sensor_map} shows how the concentration varies across countries. Countries such as the Netherlands, Italy, Czechia and Germany have a very dense collection of measuring stations, whereas the Balkans, France and Spain have more sporadic measurements. Scandinavia and the Baltics barely have any stations. Since we are using spatial data we must account for potential spatial leakage when splitting between the training folds and the test one, as images and stations are likely to overlap. For the final evaluation, we require a region that is completely held out of the training process and is used as the test set. We select north-eastern Germany, since it constitutes the sparsest region of Germany, our original target. This region has enough stations to evaluate the model, while still having sparse areas that would benefit from our objective of producing a continuous PM prediction map. 
+
+
+Figure ~\ref{fig:fold_map} shows the folds division. This arrangement is implemented to balance the relative geographical size of each fold and the total number of stations. Furthermore, we attempt to mitigate the effect of the 100 km buffer applied by having as regular borders as feasible. The latter serves as a measure to avoid spatial leakage between folds during training. 
+
+
+
+
+\noindent
+\begin{minipage}[t]{0.32\textwidth}
+    \vspace{0pt}
+    \centering
+    \includegraphics[
+        width=\textwidth,
+        trim=0 212 0 212,
+        clip
+    ]{Figures/generated/preview_patches.png}
+    \captionof{figure}{Example high-resolution (left) and low-resolution (right) Sentinel-2 patches.}
+    \label{fig:preview_patches}
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.64\textwidth}
+    \vspace{0pt}
+    \subsection{Satellite Data:}
+    
+    Satellite patches are fetched through the Google Earth Engine (GEE) API. For each reference station location, we extract Sentinel-2 (S2) multispectral patches at two spatial resolutions to capture local detail (120×120 px, 10 m/px) and wider spatial context (60×60 px, 200 m/px). The S2 patches are built as cloud-filtered annual median composites. Following the band selection used by BigEarthNet-pretrained ResNet50, we keep ten of the thirteen total Sentinel-2 bands. We therefore exclude coastal aerosol, water vapor, and cirrus. The satellite images are augmented during the training process to be randomly rotated by increments of 90 degrees. Figure~\ref{fig:preview_patches} illustrates the S2P high-resolution (left) and low-resolution (right) patches for three locations.
+    
+\end{minipage}
+
+
+
+%explanation data source 
+%how did we get it 
+
+\subsection{Pollution Covariates}
+
+In addition to S2 imagery, we incorporate four auxiliary covariates through the same GEE pipeline. Sentinel-5P (S5P) atmospheric column data provide tropospheric NO2 and CO measurements (both 5 × 5 pixels, 7 km/px), as well as aerosol index data over a wider spatial extent (31 × 31 pixels, 7 km/px). The latter motivates our choice of a 100 km buffer distance, which is intended to avoid spatial leakage from this data. S5P patches are generated as cloud-filtered annual mean composites. In addition, we obtain elevation data from the Copernicus GLO-30 digital elevation model (DEM) (15 × 15 pixels, 1 km/px).
+
+%explanation data source and relevance
+%how did we get it 
+
+%potentially a heatmap, how are they related to PM as justification for their inclusion, 
+
+\subsection{Socio-Economic Data}
+
+To examine whether modeled air-pollution exposure is spatially associated with
+socioeconomic and demographic characteristics, we construct a dataset at the
+German Kreis level. The dataset covers all 400 Kreise and combines information
+from several official sources. Population, age structure, median age, and
+population density refer to 2024 and are obtained from Eurostat. Kreis-level
+unemployment rates for 2024 are obtained from the German Federal Employment
+Agency. Disposable household income per capita is taken from the Regional
+Accounts of the German States (VGRdL) and refers to 2023. Finally, indicators
+of immigration history, nationality, and educational attainment are derived
+from the 2022 German Census. Administrative Kreis identifiers and boundaries
+are based on official BKG geodata.
+
+Because the most recent available observation year differs across data
+sources, we retain the original reference year of each variable. The socioeconomic variables
+therefore describe broadly contemporaneous, but not perfectly synchronous
+conditions between 2022 and 2024.
+
+For the subsequent analysis, we focus on disposable income, unemployment,
+educational attainment, immigration history, population density, and age
+structure. Immigration history is treated as a demographic characteristic
+rather than as an indicator of socioeconomic disadvantage. Population density
+is included because urbanicity may be associated with both socioeconomic
+characteristics and pollution exposure.
+
+Figure~\ref{fig:socioeconomic_distributions} shows the distribution of the
+selected indicators across German Kreise. Population density is shown on a
+logarithmic axis because its distribution is strongly right-skewed, with a
+small number of highly urbanized Kreise having much larger densities than the
+majority of districts.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.65\textwidth]
+    {Figures/generated/socioeconomic_indicator_boxplots.png}
+    \caption{Distribution of selected socioeconomic and demographic indicators
+    across German Kreise. Points represent individual Kreise; boxes summarize
+    the central distribution. Population density is displayed on a logarithmic
+    axis.}
+    \label{fig:socioeconomic_distributions}
+\end{figure}
+
+The socioeconomic indicators are not independent of one another
+(Figure~\ref{fig:socioeconomic_correlations}). For example, disposable income
+and unemployment are negatively correlated ($r=-0.64$), while immigration
+history is positively correlated with both population density ($r=0.72$) and
+the share of the population without a vocational qualification ($r=0.79$).
+These relationships are important when interpreting associations with
+predicted pollution, since spatial differences in one socioeconomic
+characteristic may partly reflect differences in another.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.55\textwidth]
+    {Figures/generated/socioeconomic_correlation_matrix.png}
+    \caption{Pearson correlations among selected socioeconomic indicators
+    across German Kreise. Population density is log-transformed for the
+    correlation calculation.}
+    \label{fig:socioeconomic_correlations}
+\end{figure}
+
+\section{Calibration of LC PM sensors}
+
+In this section we discuss the analysis we conduct to establish the validity of low-cost PM sensors throughout Germany. With data on humidity and temperature we attempt to calibrate the sensors with nearby reference stations. We try fitting an OLS and a Huber regression, where the dependent variable are the reference stations. To measure if the calibration methods worked, we only fit the regression on all but one of the German lands. We then test if the calibration worked on the held-out land. 
+
+
+The sensors have such unreliable measurements that the calibration attempts did not result in accurate pollution estimates. Based on the results, we prefer to resort to precise reference stations to use as our labels. Consequently, given the small number of stations in Germany, we shift our focus EEA-wide, while still considering the most undercovered regions of Germany as out test area and final objective.
+
+https://amt.copernicus.org/articles/16/4709/2023/amt-16-4709-2023.html 
+
+
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lllll}
+\hline
+ \textbf{Approach}  & \textbf{Pollutant}  &\textbf{Level}  &\textbf{Headline result}  &\textbf{Beat baseline?}  \\
+ \hline
+constant-mean baseline  &PM10  &annual  &mean RMSE 2.911  &baseline  \\
+  &PM2.5  &annual  &mean RMSE 1.836  &baseline  \\
+ \hline
+ raw SDS011 baseline  &PM10  &annual  &mean RMSE 46.310  &no  \\
+   &PM2.5  &annual  &mean RMSE 26.959  &no  \\
+\hline
+ national percentile/range mapping  &PM10  &annual  &mean RMSE 20.860  &no  \\
+  &PM2.5  &annual  &mean RMSE 12.559  &no  \\
+\hline
+ OLS regression adjustment  &PM10  &annual  &mean RMSE 3.098  &no  \\
+  &PM2.5  &annual  &mean RMSE 1.919  &no  \\
+\hline
+ Huber regression adjustment  &PM10  &annual  &mean RMSE 3.157  &no  \\
+   &PM2.5  &annual  &mean RMSE 2.169  &no  \\
+\hline
+ daily weather-aware regression  &PM10  &daily  &RMSE improvement vs constant 2.523  &yes  \\
+  &PM2.5  &daily  &RMSE improvement vs constant 2.272  &yes  \\
+\hline
+ background-station-only sensitivity  &PM10  &annual  &RMSE improvement vs constant -0.395  &no  \\
+   &PM2.5  &annual  &RMSE improvement vs constant -0.196  &no  \\
+\hline
+ clustered-sensor mean  &PM10  &annual  &RMSE 3.108  &no  \\
+  &PM10  &annual  &RMSE 3.172  &no \\
+\hline
+\end{tabular}
+}
+
+
+
+
+%explanation of calibration process 
+%   inclusion of table with calibration attempts and metrics
+%   visual of simones story of sensors in same area with different values 
+
+
+\section{Models}
+We trained two models. Firstly, a CNN, constructed from scratch, and secondly, we finetuned an existing ResNet CNN. This way we can observe the benefit from using a model that already has a backbone created based on satellite images. 
+
+\subsection{CNN created from scratch}
+
+
+% # CNN architecture
+\begin{table}[ht]
+\centering
+\caption{Architecture of the selected scratch multi-input CNN (\texttt{cnn\_deep\_wide}). Each image modality is processed by a separate CNN branch before the resulting feature representations are normalized and combined with scalar context.}
+\label{tab:cnn_deep_wide_architecture}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llll}
+\hline
+\textbf{Branch} & \textbf{Block} & \textbf{Channels} & \textbf{Operations} \\
+\hline
+
+High-resolution &
+Block 1 & 48 &
+3 $\times$ [Conv $3\times3$ $\rightarrow$ BatchNorm $\rightarrow$ ReLU] $\rightarrow$ MaxPool \\
+&
+Block 2 & 96 &
+3 $\times$ [Conv $3\times3$ $\rightarrow$ BatchNorm $\rightarrow$ ReLU] $\rightarrow$ MaxPool \\
+&
+Block 3 & 192 &
+3 $\times$ [Conv $3\times3$ $\rightarrow$ BatchNorm $\rightarrow$ ReLU] $\rightarrow$ MaxPool \\
+&
+Block 4 & 384 &
+3 $\times$ [Conv $3\times3$ $\rightarrow$ BatchNorm $\rightarrow$ ReLU] $\rightarrow$ MaxPool \\
+&
+Output & 384 &
+Global Average Pooling \\
+\hline
+
+Low-resolution &
+Block 1 & 32 &
+Conv $3\times3$ $\rightarrow$ BatchNorm $\rightarrow$ ReLU $\rightarrow$ MaxPool \\
+&
+Block 2 & 128 &
+Conv $3\times3$ $\rightarrow$ BatchNorm $\rightarrow$ ReLU \\
+\hline
+
+Sentinel-5P (NO2, CO) &
+Block 1 & 32 &
+Conv $3\times3$ $\rightarrow$ BatchNorm $\rightarrow$ ReLU \\
+&
+Block 2 & 32 &
+Conv $3\times3$ $\rightarrow$ BatchNorm $\rightarrow$ ReLU \\
+&
+Output & 32 &
+Global Average Pooling \\
+\hline
+
+Wide-Aerosol &
+Block 1 & 32 &
+Conv $3\times3$ (stride 2) $\rightarrow$ BatchNorm $\rightarrow$ ReLU \\
+&
+Block 2 & 32 &
+Conv $3\times3$ (stride 2) $\rightarrow$ BatchNorm $\rightarrow$ ReLU \\
+&
+Output & 32 &
+Global Average Pooling \\
+\hline
+
+DEM &
+Block 1 & 32 &
+Conv $3\times3$ $\rightarrow$ BatchNorm $\rightarrow$ ReLU $\rightarrow$ MaxPool \\
+&
+Block 2 & 32 &
+Conv $3\times3$ $\rightarrow$ BatchNorm $\rightarrow$ ReLU \\
+&
+Output & 32 &
+Global Average Pooling \\
+\hline
+
+Fusion &
+Normalization & -- &
+Normalize outputs of all five CNN branches \\
+&
+Scalar context & -- &
+NO2/CO patch means, aerosol center-pixel value, elevation \\
+\hline
+
+\end{tabular}
+}
+\end{table}
+
+
+The CNN created from scratch is a multi-model that assembles several models for each of the data inputs. The model analyzing the high resolution satellite patches has four blocks. In each of the four blocks, the channel size increases across each block, in the following sequence: 48, 96, 192, 384. Each block contains 3 sequences of: a 3 by 3 convolution, a batch normalization, and a ReLU function. At the end of the block, the output is reduced using a maxpool to make sure the channel number remains stable within each of the model blocks. After all four blocks all channels are pooled to one average number, which is the model output. The model that analyses the low resolution satellite patches, has only 2 blocks, that are apply the sequence of what happens in high resolution block but only once. So, first a 3 by 3 convolution, a batch normalisation and a ReLU. The second block will jump directly to 128 channels. In between both block there is a maxpool as well. The model for the sp5 images has a smaller input dimension of 2$\times$5$\times$5 (two stacked channels — NO2 and CO — at 5×5 pixels, 7 km/pixel) and uses 32 channels throughout. It has the same sequence of steps in its 2 blocks as the low resolution cnn, but without the maxpool in between. Each branch is normalized independently before fusion, preventing differences in output scale from dominating the combined representation. In addition to the convolutional branches, a small four-value scalar vector (\texttt{xs\_mean}) is fed directly into the regression head: the spatial mean of the NO2 patch, the spatial mean of the CO patch, the center-pixel value of the wide aerosol context patch, and station elevation in km. This gives the head direct access to raw scalar context alongside the learned convolutional features.
+
+
+\begin{table}[ht]
+\centering
+\caption{Hyperparameters for the scratch CNN (\texttt{cnn\_deep\_wide}).}
+\label{tab:cnn_deep_wide_hparams}
+\begin{tabular}{ll}
+\hline
+\textbf{Hyperparameter} & \textbf{Value} \\
+\hline
+High-resolution channels & 48 $\rightarrow$ 96 $\rightarrow$ 192 $\rightarrow$ 384 \\
+Conv layers per block & 3 \\
+Learning rate & $3\times10^{-4}$ \\
+Weight decay & $1\times10^{-7}$ \\
+Dropout & 0.5 \\
+Batch size & 128 \\
+Projection dim & 64 \\
+Low-res CNN channels & 32 $\rightarrow$ 128 \\
+Sentinel-5P CNN hidden width & 32 \\
+Wide-aerosol feature dim & 32 \\
+DEM feature dim & 32 \\
+Regression head hidden width & 64 \\
+Spatial buffer & 100 km \\
+TTA & enabled (8 views) \\
+Max epochs / patience & 500 / 25 \\
+\hline
+\end{tabular}
+\end{table}
+
+
+
+
+\subsection{Fine-tuned Model}
+
+The fine-tuned variant replaces the scratch high-resolution encoder with a ResNet-50 pre-trained on BigEarthNet, a large Sentinel-based remote-sensing dataset. Specifically, it was originally pre-trained to classify land-cover usage. It is important to highlight that only high resolution S2P patches pass through this model, every other data modality remains the same scratch CNN modules described in subsection 4.1. In other words, this variant tests whether features learned for land-cover classification transfer usefully to pixel-level PM 2.5 regression, or whether the two tasks are different enough that training an encoder from scratch on the pollution data directly is preferable.
+
+\begin{table}[ht]
+\centering
+\caption{Architecture of the frozen-backbone multi-input model. The high-resolution branch uses a BigEarthNet-pretrained ResNet50 (10-channel input) as a fixed feature extractor; only the projection after the backbone is trainable. Note that Low-resolution, Sentinel-5P, Wide-Aerosol, DEM, and Fusion branches are identical to \texttt{cnn\_deep\_wide} (Table~\ref{tab:cnn_deep_wide_architecture}).}
+\label{tab:resnet_frozen_architecture}
+\begin{tabular}{llll}
+\hline
+\textbf{Branch} & \textbf{Block} & \textbf{Channels} & \textbf{Operations} \\
+\hline
+High-resolution &
+Stem & 64 &
+Conv $7\times7$ $\rightarrow$ BatchNorm (frozen) $\rightarrow$ ReLU $\rightarrow$ MaxPool \\
+&
+Layer 1 & 256 &
+3 $\times$ Bottleneck [Conv $1\times1$ $\rightarrow$ Conv $3\times3$ $\rightarrow$ Conv $1\times1$], frozen \\
+&
+Layer 2 & 512 &
+4 $\times$ Bottleneck, frozen \\
+&
+Layer 3 & 1024 &
+6 $\times$ Bottleneck, frozen \\
+&
+Layer 4 & 2048 &
+3 $\times$ Bottleneck, frozen \\
+&
+Output &
+64 &
+Global Average Pooling $\rightarrow$ Linear projection (trainable) \\
+\hline
+\end{tabular}
+\end{table}
+
+
+
+
+We experiment with several hyperparameter configurations, especially varying the freezing or unfreezing of the backbone layers, the learning rate and the dropout rate. Table~\ref{tab:resnet_frozen_architecture} reports the architecture of our best-performing fine-tuned model, while Table~\ref{tab:resnet_frozen_hparams} summarizes the hyperparameters. Results are reported in Section~\ref{sec:results}.
+ We find that keeping the whole backbone frozen with a particularly aggressive dropout rate (0.8) yields better results. 
+
+
+
+
+
+\begin{table}[ht]
+\centering
+\caption{Hyperparameters for the frozen-backbone model. All other values (weight decay, batch size, projection dim, low-res/Sentinel-5P/wide-aerosol/DEM branch widths, regression head width, spatial buffer, TTA, max epochs/patience) are identical to \texttt{cnn\_deep\_wide} (Table~\ref{tab:cnn_deep_wide_hparams}).}
+\label{tab:resnet_frozen_hparams}
+\begin{tabular}{ll}
+\hline
+\textbf{Hyperparameter} & \textbf{Value} \\
+\hline
+lr\_head & $1\times10^{-5}$ \\
+dropout & 0.8 \\
+\hline
+\end{tabular}
+\end{table}
+
+
+\section{Results}
+\label{sec:results}
+
+\subsection{Training}
+
+Both models are trained under identical leave-one-fold-out cross-validation: eight geographically defined development folds. Each take a turn as the validation fold, with the model trained on the remaining seven. Training stations within 100 km of any validation station are removed from that fold's training set to prevent spatial leakage between neighbouring, highly correlated locations. The northern/eastern German TEST region is never used at this stage; it is sealed until the final evaluation in Section~\ref{sec:results} (Section~\ref{sec:results}.2). Both models are trained with early stopping (patience 25 epochs, maximum 500), selecting the epoch with the lowest validation RMSE per fold.
+
+\begin{table}[ht]
+\centering
+\caption{Per-fold cross-validation results for the scratch CNN (\texttt{cnn\_deep\_wide}, PM 2.5).}
+\label{tab:cnn_deep_wide_folds}
+\begin{tabular}{lccccc}
+\hline
+\textbf{Fold} & \textbf{Best epoch} & \textbf{RMSE} & \textbf{MAE} & \textbf{R}$^2$ & \textbf{Baseline RMSE} \\
+\hline
+fold1\_iberia    & 10 & 2.330 & 1.799 & 0.180  & 4.200 \\
+fold2\_france    & 27 & 1.999 & 1.501 & -0.460 & 4.203 \\
+fold3\_italy     & 18 & 3.508 & 2.749 & 0.329  & 5.051 \\
+fold4\_alpine    & 1  & 1.946 & 1.502 & -0.187 & 3.377 \\
+fold5\_north     & 1  & 3.419 & 3.002 & -1.579 & 5.271 \\
+fold6\_balkan\_e & 71 & 6.168 & 4.290 & 0.002  & 8.297 \\
+fold7\_balkan\_s & 37 & 6.681 & 4.838 & -0.020 & 9.400 \\
+fold8\_poland    & 12 & 4.654 & 3.809 & -1.441 & 4.730 \\
+\hline
+Pooled out-of-fold ($n=1869$) & -- & 3.823 & 2.700 & 0.417 & -- \\
+\hline
+\end{tabular}
+\end{table}
+
+
+\textbf{CNN from scratch:} 
+Best-epoch selection varies substantially across folds, from a single epoch (fold4\_alpine, fold5\_north) to 71 epochs (fold6\_balkan\_e). The two single-epoch folds likely reflect an early, favourable validation snapshot rather than genuine convergence, given how little training the model receives before early stopping triggers; we treat their per-fold metrics with corresponding caution, while noting they do not drive the pooled result, which is dominated by the larger folds. Per-fold R\textsuperscript{2} is negative on five of eight folds even though pooled R\textsuperscript{2} is positive (0.417) -- a first indication of the same overall-vs-subgroup tension discussed in Section~\ref{sec:results}.2 for the sealed TEST evaluation.
+
+
+\begin{table}[ht]
+\centering
+\caption{Per-fold cross-validation results for the ResNet-50 model (PM 2.5).}
+\label{tab:resnet_frozen_folds}
+\begin{tabular}{lccccc}
+\hline
+\textbf{Fold} & \textbf{Best epoch} & \textbf{RMSE} & \textbf{MAE} & \textbf{R}$^2$ & \textbf{Baseline RMSE} \\
+\hline
+fold1\_iberia    & 16  & 3.031 & 2.585 & -0.386 & 4.200 \\
+fold2\_france    & 14  & 3.091 & 2.824 & -2.489 & 4.203 \\
+fold3\_italy     & 240 & 4.426 & 3.333 & -0.069 & 5.051 \\
+fold4\_alpine    & 31  & 2.170 & 1.852 & -0.476 & 3.377 \\
+fold5\_north     & 20  & 4.275 & 3.808 & -3.033 & 5.271 \\
+fold6\_balkan\_e & 439 & 7.749 & 5.262 & -0.574 & 8.297 \\
+fold7\_balkan\_s & 151 & 8.859 & 6.966 & -0.793 & 9.400 \\
+fold8\_poland    & 1   & 5.551 & 4.834 & -2.472 & 4.730 \\
+\hline
+Pooled out-of-fold ($n=1869$) & -- & 4.870 & 3.656 & 0.054 & -- \\
+\hline
+\end{tabular}
+\end{table}
+
+
+\textbf{CNN ResNet-50}
+Table~\ref{tab:resnet_frozen_folds} reports the results by fold, and Table~\ref{tab:main_model_comparison} shows the pooled results. Figure~\ref{fig:learning_curves_summary} illustrates the validation learning curves for each fold. The model varies training time drastically by fold. In fold8, containing Poland, Czechia and Slovakia the model does not train at all, while in fold6 the model's best result is reached at epoch number 439.
+
+
+Fold8's failure to train at all and fold6's very late convergence (epoch 439 of a 500-epoch budget) suggest that the frozen backbone's small trainable head (236,065 parameters) struggles with some geographic distributions more than others, consistent with the frozen ResNet's substantially worse pooled RMSE compared to the scratch CNN (4.870 vs.\ 3.823).
+
+
+\begin{figure}[ht]
+    \centering
+    \makebox[\textwidth][c]{%
+        \includegraphics[width=1\textwidth]{Figures/generated/learning_curves_resnet_frozen_objective_loss.png}
+    }
+    \caption{Objective-loss learning curves summary.}
+    \label{fig:learning_curves_summary}
+\end{figure}
+
+
+\paragraph{Data size ablation}
+For the sake of data efficiency, we run several training cycles with smaller training sets, one with 25\% of the training data, one with 50\%. We sample the training sets from each fold to keep the folds similar in size. The figures~\ref{fig:data_size_rmse_learning_curve} and~\ref{fig:data_size_mae_learning_curve} show the mean squared and absolute errors. Both metrics show a downward trend for the RES Net model. The CNN model created from scratch has a smaller mean squared error with the full training set, but a slightly higher mean absolute error. The full training data reduces the outliers in the predictions, while slightly increasing the mean absolute error. 
+
+\begin{figure}
+     \centering
+     \includegraphics[width=0.92\textwidth]{Figures/generated/data_size_ablation_summary.png}
+     \caption{Ablation cycles RMSE and MAE for both models}
+     \label{fig:data_size_rmse_learning_curve}
+     \label{fig:data_size_mae_learning_curve}
+\end{figure}
+
+%explanation why this is necessary 
+%results from the datasize ablation
+
+\subsection{Evaluation}
+
+\begin{table}[ht]
+\centering
+\caption{Cross-validation results, pooled out-of-fold ($n=1869$), PM 2.5.}
+\label{tab:main_model_comparison}
+\begin{tabular}{lccc}
+\hline
+\textbf{Model} & \textbf{RMSE} & \textbf{MAE} & \textbf{R}$^2$ \\
+\hline
+Scratch CNN (\texttt{cnn\_deep\_wide}) & 3.823 & 2.700 & 0.417 \\
+Frozen ResNet50 backbone & 4.870 & 3.656 & 0.054 \\
+\hline
+\end{tabular}
+\end{table}
+
+The scratch CNN outperforms the frozen-backbone ResNet across all three pooled cross-validation metrics (Table~\ref{tab:main_model_comparison}), with a substantially lower RMSE (3.823 vs.\ 4.870) and higher R\textsuperscript{2} (0.417 vs.\ 0.054). We accordingly select \texttt{cnn\_deep\_wide} as the final model, both for the sealed TEST evaluation below and for the dense-grid deployment in Section~\ref{sec:results}.3.
+
+\begin{table}[ht]
+\centering
+\caption{Final evaluation on the sealed TEST region (northern/eastern Germany, PM 2.5, \texttt{cnn\_deep\_wide}, $n=164$).}
+\label{tab:test_summary}
+\begin{tabular}{lc}
+\hline
+\textbf{Metric} & \textbf{Value} \\
+\hline
+MAE & 1.894 \\
+RMSE & 2.375 \\
+R$^2$ (vs. TEST-set mean) & -1.750 \\
+Bias (mean prediction $-$ mean observation) & +1.748 \\
+Fraction of stations overpredicted & 87.2\% \\
+Training-mean baseline RMSE & 2.782 \\
+RMSE improvement over training-mean baseline & 14.6\% \\
+\hline
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:test_summary} reports the model's performance on the 164 sealed TEST stations, never seen during development. The negative R\textsuperscript{2} looks alarming in isolation, but it compares the model against predicting the TEST set's own mean -- a reference point that is only knowable in hindsight and is not available at deployment time. The more meaningful comparison is against the training-mean baseline (11.04 \si{\micro\gram\per\cubic\meter}, the only deployable constant-prediction baseline), against which the model reduces RMSE by 14.6\%. The model also shows a clear systematic bias: it overpredicts at 87.2\% of stations, by 1.75 \si{\micro\gram\per\cubic\meter} on average.
+
+\begin{table}[ht]
+\centering
+\caption{TEST-set performance by German federal state (\texttt{cnn\_deep\_wide}, PM 2.5).}
+\label{tab:test_by_state}
+\begin{tabular}{lcccc}
+\hline
+\textbf{State} & \textbf{n} & \textbf{Bias} & \textbf{MAE} & \textbf{R}$^2$ \\
+\hline
+Berlin                  & 12 & 1.182 & 1.182 & 0.235 \\
+Hamburg                 & 8  & 0.394 & 0.678 & -2.384 \\
+Bremen                  & 4  & 0.370 & 0.625 & -26.02 \\
+Sachsen                 & 19 & 2.052 & 2.146 & -1.790 \\
+Niedersachsen           & 29 & 1.574 & 1.712 & -4.410 \\
+Mecklenburg-Vorpommern  & 18 & 1.313 & 1.495 & -6.931 \\
+Thueringen              & 21 & 1.738 & 2.054 & -4.744 \\
+Brandenburg             & 25 & 1.853 & 1.853 & -7.683 \\
+Schleswig-Holstein      & 10 & 2.381 & 2.579 & -8.270 \\
+Sachsen-Anhalt          & 18 & 2.944 & 3.105 & -7.038 \\
+\hline
+\end{tabular}
+\end{table}
+
+Reliability is highly uneven across the TEST region (Table~\ref{tab:test_by_state}). Berlin is the only state with positive R\textsuperscript{2} (0.235) and the lowest bias, plausibly because its higher station density and urban pollution profile are better represented in the development folds. Bremen's extreme R\textsuperscript{2} ($-26.0$) is largely a small-sample artefact ($n=4$) rather than evidence of poor model behaviour there, and should not be weighted equally with the larger states. Sachsen-Anhalt shows both the largest bias (+2.94) and worst error (MAE 3.11), making it the state where predictions should be treated most cautiously. In general, predictions are most trustworthy in and around dense, well-covered urban areas and least trustworthy in the sparsest rural stretches of the TEST region -- precisely the areas a deployed model would be most valuable for, and precisely where we can vouch for it least.
+
+This directly bears on the ethics of acting on predicted rather than measured pollution: the model is not uniformly reliable across the region it is meant to serve, and any policy use of the resulting map should weight predictions by local reliability (e.g. distance to the nearest training station, or state-level performance as in Table~\ref{tab:test_by_state}) rather than treating the continuous 
+map in Section~\ref{sec:results}.3 as equally trustworthy everywhere.
+
+\subsection{Implementation of Dense Grid Map}
+
+We apply our best performing model to create a continuous map of North-Eastern Germany by firstly predicting point estimates across the region on a regular grid spaced at 10 km intervals. To obtain a smooth, continuous surface from these point estimates we construct a Delaunay triangulation over the grid points. We therefore connect each point to its adjacent neighbours to form a triangle mesh, and we interpolate within each triangle based on the values of the three grid points constituting the triangle vertices. The result is a continuous visual surface of PM 2.5 predictions across north-eastern Germany. We argue it is reasonable to interpolate values across a 10km span using triangle meshes, as pollution at that granularity tends to vary smoothly, except in the immediate vicinity of highly localized emission sources.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\textwidth]{Figures/generated/dense_prediction_residual_maps.png}
+    \caption{Continuous grid map of predicted PM 2.5 across the TEST region and spatial distribution of model residuals on the test set.}
+    \label{fig:continuous_grid_map}
+    \label{fig:test_residual_map}
+\end{figure}
+
+The result is displayed in Figure~\ref{fig:continuous_grid_map}. The minimum predicted PM 2.5 is 4.8 \si{\micro\gram\per\cubic\meter}, while the maximum is 17.4. There are two clear hotspots in the region, roughly corresponding to the cities of Berlin and Leipzig. Other cities like Hamburg and Hanover instead show far lower pollution estimates. This is a promising sign that the model does not simply associate high pollution with population density alone, but incorporates other relevant factors such as wider spatial context and the aerosol index covariate.
+
+
+Overall, there is tendency to overestimate PM values in this region. Figure~\ref{fig:test_residual_map} plots the values. While significant and worthy of attention, we argue that this systematic bias does not change the relative order of intervention priority in the region, and the predictions therefore remain useful to policy makers -- keeping in mind the state-level reliability differences reported in Table~\ref{tab:test_by_state}.
+%creation and discussion gridmap pollution
+
+
+\section{Socio-Economic Analysis}
+
+\subsection{Aggregation of predicted PM2.5 to Kreis level}
+
+The dense-grid predictions described in Section~\ref{sec:results} are produced
+at regularly spaced locations rather than directly at administrative units.
+To combine these predictions with the socioeconomic data, each grid point is
+therefore assigned to the Kreis polygon containing its centre coordinates.
+Predicted PM2.5 is then averaged across all grid points located within each
+Kreis.
+
+Of 1,728 usable grid predictions, 1,719 could be assigned to a Kreis. This
+results in Kreis-level modeled pollution estimates for 134 Kreise within the
+North-Eastern German prediction domain. The number of contributing grid
+points varies with Kreis size, ranging from 1 to 54, with a median of 12 grid
+points per Kreis.
+
+Our main exposure measure is the arithmetic mean of the predicted PM2.5
+values within each Kreis. It should therefore be interpreted as an
+area-oriented estimate of mean modeled ambient pollution rather than as a
+population-weighted measure of individual exposure. Constructing the latter
+would require information on the within-Kreis spatial distribution of the
+population.
+
+Across the 134 covered Kreise, mean predicted PM2.5 ranges from approximately
+6.02 to 13.12~\si{\micro\gram\per\cubic\meter}, with an overall Kreis mean of
+9.88~\si{\micro\gram\per\cubic\meter}.
+
+\subsection{Spatial patterns}
+
+Figure~\ref{fig:socioeconomic_maps} compares the spatial distribution of mean
+predicted PM2.5 with selected socioeconomic and demographic indicators.
+All panels refer to the same modeled study region. Kreise outside the dense
+prediction grid are shown only as geographic context and are not included in
+the analysis.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\textwidth]
+    {Figures/generated/socioeconomic_summary_maps.png}
+    \caption{Mean predicted PM2.5 and selected socioeconomic and demographic
+    characteristics across Kreise covered by the dense prediction grid.
+    Population density is displayed using a logarithmic color scale.}
+    \label{fig:socioeconomic_maps}
+\end{figure}
+
+The maps show substantial spatial variation in both modeled PM2.5 and the
+socioeconomic indicators. However, the spatial patterns do not indicate a
+single, consistent socioeconomic gradient in modeled pollution. Areas of
+higher predicted PM2.5 overlap with some relatively dense and urbanized
+Kreise, but similar pollution levels also occur across Kreise with different
+income, unemployment, education, and demographic profiles. We therefore
+evaluate these relationships quantitatively rather than inferring an exposure
+gradient from the maps alone.
+
+\subsection{Association with socioeconomic characteristics}
+
+Table~\ref{tab:pm25_socioeconomic_correlations} reports descriptive Pearson
+correlations between mean predicted PM2.5 and the selected Kreis-level
+indicators. The associations are generally weak. The strongest positive
+association is observed for unemployment ($r=0.225$), followed by university
+degree share ($r=0.198$) and log population density ($r=0.171$). Disposable
+income is weakly negatively associated with predicted PM2.5 ($r=-0.145$).
+Immigration history shows essentially no linear relationship with predicted
+PM2.5 ($r=-0.022$).
+
+\begin{table}[ht]
+\centering
+\caption{Pearson correlations between Kreis-level mean predicted PM2.5 and
+selected socioeconomic and demographic indicators. Correlations are
+descriptive and do not imply causal relationships.}
+\label{tab:pm25_socioeconomic_correlations}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Indicator} & \textbf{$n$} & \textbf{Pearson $r$} \\
+\midrule
+Disposable income per capita      & 132 & -0.145 \\
+Unemployment rate                 & 134 &  0.225 \\
+No vocational qualification       & 134 & -0.153 \\
+University degree                 & 134 &  0.198 \\
+Immigration history               & 134 & -0.022 \\
+Log population density            & 134 &  0.171 \\
+Population aged 65+               & 134 & -0.120 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Overall, these results provide little evidence for a strong or uniform
+socioeconomic gradient in modeled PM2.5 across the study region. The weak
+negative association with disposable income and weak positive association
+with unemployment are consistent with somewhat higher modeled pollution in
+more economically disadvantaged Kreise, but their magnitude is small.
+Moreover, other indicators do not follow the same pattern: the share without
+a vocational qualification is weakly negatively associated with predicted
+PM2.5, while university-degree share is weakly positively associated with it.
+The near-zero association with immigration history further illustrates that
+the observed spatial patterns cannot be summarized by a single dimension of
+social disadvantage.
+
+These results should also be interpreted in light of the limitations of the
+pollution estimates themselves. The socioeconomic analysis is based on model
+predictions rather than direct measurements, and Section~\ref{sec:results}
+shows systematic overprediction and heterogeneous predictive performance in
+the held-out German region. In addition, the Kreis-level PM2.5 measure is an
+unweighted spatial average and does not account for where people live within
+each Kreis. Consequently, the analysis should be understood as an exploratory
+assessment of spatial associations between modeled ambient pollution and
+Kreis-level socioeconomic characteristics, rather than as evidence of causal
+environmental inequality or individual exposure differences.
+
+https://www.eea.europa.eu/en/analysis/maps-and-charts/air-quality-statistics-dashboards
+
+\section{Conclusion}
+
+In this project, we build a model that predicts PM 2.5 pollution given exclusively publicly available satellite data. For a given location, patches are collected and the output is a PM2.5 point estimate. The results show better results than the baseline, suggesting that there is a slight tendency to overestimate pollution in the test region (NE Germany). Moreover, we provide evidence of the unreliability of low cost sensors and resort to using EEA-wide reference stations as labels for our models. We show that from scratch models perform better in estimating PM2.5 in the test region compared to the ResNet-50 model pre-trained on BigEarthNet. We offer possible explanations to why that is the case. Finally, we show that PM 2.5 correlates to several social indicators, underscoring that ......
+
+There are several limitations to our project. 
+
+The performance of the model could be further improved by including additional scalar variables, especially the ones related to metereological phenomena.
+
+%how good is the model at predicting pollution 
+
+%conclusion from socio economic analysis 
+
+%implications: include the question is it ok to act on predicted no measured values
+
+%limitations of our approach 
+
+%Limitations 
+%improvement of models, inclusion of additional covariates. 
+%- regulations (factors with filters, regulation for cars) 
+%- gdp 
+%- power type used in region 
+%- additional scalar values 
+%- airflow 
+%- larger spatial context (po-area) 
+
+%future work?
+
+\bibliography{references}
+\cite{who2021airquality}
+\cite{scheibenreif2021airpollution,benabbas2019particulate}
+\clearpage
+\section*{Appendix}
+\appendix
+
+\section{Additional Graphs and Images}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.2\textwidth]{Figures/sds011_sensor.jpg}
+    \caption{SDS011 sensor, the most common low-cost sensor in Germany}
+    \label{fig:sds011_sensor}
+\end{figure}
+
+\end{document}

@@ -3,12 +3,25 @@ papers/
 task/
 venv/
 client_id_GEE.txt
-.vscode/
+.vscode/*
+!.vscode/settings.json
 __pycache__/
 *.py[cod]
 .ipynb_checkpoints/
 .DS_Store
 ._*
+
+# LaTeX build output
+Air_pollution_report/build/
+Air_pollution_report/*.aux
+Air_pollution_report/*.bbl
+Air_pollution_report/*.blg
+Air_pollution_report/*.fdb_latexmk
+Air_pollution_report/*.fls
+Air_pollution_report/*.log
+Air_pollution_report/*.out
+Air_pollution_report/*.synctex.gz
+Air_pollution_report/*.toc
 06_models/02_resnet/final_model.pt
 04_GEE/sensors-related/
 eea_model_upload_bundle.zip

@@ -8,6 +8,7 @@ import math
 import os
 import urllib.request
 from pathlib import Path
+import sys
 
 _CACHE_ROOT = Path(os.environ.get("TMPDIR", "/tmp"))
 os.environ.setdefault("MPLCONFIGDIR", str(_CACHE_ROOT / "matplotlib"))
@@ -24,6 +25,15 @@ import pandas as pd
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+import report_plot_style
+
+report_plot_style.apply()
+savefig = report_plot_style.savefig
+PALETTE = report_plot_style.PALETTE
+
 PREDICTIONS = ROOT / "06_models" / "results" / "cnn_deep_wide" / "test_predictions.csv"
 CHECKPOINT = ROOT / "06_models" / "results" / "cnn_deep_wide" / "final_model.pt"
 OUT = ROOT / "07_prediction_analysis" / "outputs"
@@ -328,7 +338,7 @@ def save_scatter(df, metrics):
     pad = max((hi - lo) * 0.06, 0.25)
     lo, hi = lo - pad, hi + pad
 
-    fig, ax = plt.subplots(figsize=(6.0, 6.0), dpi=160)
+    fig, ax = plt.subplots(figsize=(6.0, 6.0))
     ax.scatter(df["observed"], df["predicted"], s=34, alpha=0.78, edgecolor="white", linewidth=0.35)
     ax.plot([lo, hi], [lo, hi], color="black", linewidth=1.0, linestyle="--", label="1:1")
     ax.set_xlim(lo, hi)
@@ -347,7 +357,7 @@ def save_scatter(df, metrics):
     ax.legend(loc="lower right")
     ax.grid(True, alpha=0.25)
     fig.tight_layout()
-    fig.savefig(path)
+    savefig(fig, path)
     plt.close(fig)
     return path
 
@@ -356,29 +366,29 @@ def save_distributions(df):
     path = FIGURES / "test_prediction_distributions.png"
     values = pd.concat([df["observed"], df["predicted"]])
     bins = np.linspace(values.min(), values.max(), 18)
-    fig, ax = plt.subplots(figsize=(7.0, 4.5), dpi=160)
-    ax.hist(df["observed"], bins=bins, alpha=0.55, label="Observed", color="#2f6f9f")
-    ax.hist(df["predicted"], bins=bins, alpha=0.55, label="Predicted", color="#d9822b")
+    fig, ax = plt.subplots(figsize=(7.0, 4.5))
+    ax.hist(df["observed"], bins=bins, alpha=0.55, label="Observed", color=PALETTE["blue"])
+    ax.hist(df["predicted"], bins=bins, alpha=0.55, label="Predicted", color=PALETTE["orange"])
     ax.set_xlabel(f"Annual PM2.5 [{UNITS}]")
     ax.set_ylabel("Number of TEST stations")
     ax.legend()
     ax.grid(True, axis="y", alpha=0.25)
     fig.tight_layout()
-    fig.savefig(path)
+    savefig(fig, path)
     plt.close(fig)
     return path
 
 
 def save_residual_distribution(df):
     path = FIGURES / "test_residual_distribution.png"
-    fig, ax = plt.subplots(figsize=(7.0, 4.5), dpi=160)
-    ax.hist(df["residual"], bins=20, color="#6d5f9f", alpha=0.75)
+    fig, ax = plt.subplots(figsize=(7.0, 4.5))
+    ax.hist(df["residual"], bins=20, color=PALETTE["purple"], alpha=0.75)
     ax.axvline(0, color="black", linewidth=1.0)
     ax.set_xlabel(f"Residual: prediction - observation [{UNITS}]")
     ax.set_ylabel("Number of TEST stations")
     ax.grid(True, axis="y", alpha=0.25)
     fig.tight_layout()
-    fig.savefig(path)
+    savefig(fig, path)
     plt.close(fig)
     return path
 
@@ -423,7 +433,7 @@ def plot_map_panel(ax, df, value_col, title, *, cmap, colorbar_label, extent, ma
 
 
 def save_station_map(df, value_col, title, path, *, cmap, colorbar_label, extent, map_context, vmin=None, vmax=None, norm=None):
-    fig, ax = plt.subplots(figsize=(6.4, 6.8), dpi=160)
+    fig, ax = plt.subplots(figsize=(6.4, 6.8))
     sc = plot_map_panel(
         ax,
         df,
@@ -440,14 +450,14 @@ def save_station_map(df, value_col, title, path, *, cmap, colorbar_label, extent
     cb = fig.colorbar(sc, ax=ax, shrink=0.82)
     cb.set_label(colorbar_label)
     fig.tight_layout()
-    fig.savefig(path)
+    savefig(fig, path)
     plt.close(fig)
     return path
 
 
 def save_observed_predicted_pair(df, conc_min, conc_max, extent, map_context):
     path = FIGURES / "test_observed_predicted_maps.png"
-    fig, axes = plt.subplots(1, 2, figsize=(11.5, 6.0), dpi=160, constrained_layout=True)
+    fig, axes = plt.subplots(1, 2, figsize=(11.5, 6.0), constrained_layout=True)
     last = None
     for ax, value_col, title in [
         (axes[0], "observed", "Observed annual PM2.5"),
@@ -468,7 +478,7 @@ def save_observed_predicted_pair(df, conc_min, conc_max, extent, map_context):
     cb = fig.colorbar(last, ax=axes, shrink=0.78)
     cb.set_label(f"Annual PM2.5 [{UNITS}]")
     fig.suptitle("Sealed TEST stations: observed vs predicted", y=1.02)
-    fig.savefig(path, bbox_inches="tight")
+    savefig(fig, path)
     plt.close(fig)
     return path
 

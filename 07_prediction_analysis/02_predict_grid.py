@@ -24,7 +24,9 @@ outputs:
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "06_models"))
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "06_models"))
+sys.path.insert(0, str(ROOT))
 
 import argparse
 import numpy as np
@@ -34,6 +36,7 @@ from torch.utils.data import DataLoader, Dataset
 from shared import data, paths, runtime
 from shared.config import BATCH_SIZE, CACHE_PATCHES, DEVICE, DISPLAY, MODEL, NUM_WORKERS, USE_TTA, result_paths
 from shared.models import SUPPORTED_EXPERIMENTS, require_single_experiment, selected_model
+import report_plot_style
 
 
 GRID_SAT = paths.PROC / "satellite_grid"
@@ -128,6 +131,7 @@ def make_map(df, pollutant, path):
     from matplotlib.patches import Polygon
     from matplotlib.collections import PatchCollection
 
+    report_plot_style.apply()
     fig, ax = plt.subplots(figsize=(9, 9))
 
     # drop the longest-edge triangles so only real coverage gets colored
@@ -164,7 +168,7 @@ def make_map(df, pollutant, path):
     fig.tight_layout()
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=160)
+    report_plot_style.savefig(fig, path)
     plt.close(fig)
     print(f"saved {path}")
 def parse_args():

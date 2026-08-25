@@ -61,25 +61,44 @@ def plot_data_size_curve():
         print(f"SKIP data-size curve: missing {summary_path}")
         return
     import matplotlib.pyplot as plt
+    import seaborn as sns
+    import report_plot_style
 
     out_dir = RESULTS_DIR / "figures"
     out_dir.mkdir(parents=True, exist_ok=True)
     summary = pd.read_csv(summary_path)
     for metric, label in [("rmse", "RMSE"), ("mae", "MAE")]:
-        fig, ax = plt.subplots(figsize=(7.2, 4.5))
+        fig, ax = plt.subplots(figsize=report_plot_style.FIGSIZE_SINGLE)
         for model, sub in summary.groupby("model"):
             sub = sub.sort_values("fraction")
             x = sub["fraction"] * 100
             y = sub[f"pooled_oof_{metric}_mean"]
             yerr = sub.get(f"pooled_oof_{metric}_std")
-            ax.errorbar(x, y, yerr=yerr, marker="o", linewidth=1.8, capsize=3, label=model)
-        ax.set_title(f"Data-size learning curve: pooled geographic-CV {label}")
+            sns.lineplot(
+                x=x,
+                y=y,
+                marker="o",
+                linewidth=1.8,
+                color=report_plot_style.model_color(model),
+                label=report_plot_style.model_label(model),
+                ax=ax,
+            )
+            ax.errorbar(
+                x,
+                y,
+                yerr=yerr,
+                fmt="none",
+                ecolor=report_plot_style.model_color(model),
+                elinewidth=1.0,
+                capsize=3,
+                alpha=0.9,
+            )
         ax.set_xlabel("training fraction [%]")
-        ax.set_ylabel(f"pooled OOF {label} [ug/m3]")
-        ax.grid(True, alpha=0.25)
-        ax.legend(frameon=False)
+        ax.set_ylabel(f"pooled OOF {label} [µg/m³]")
+        report_plot_style.clean_axis(ax)
+        ax.legend(frameon=False, title=None)
         fig.tight_layout()
-        fig.savefig(out_dir / f"data_size_{metric}_learning_curve.png", dpi=200)
+        plotting.savefig(fig, out_dir / f"data_size_{metric}_learning_curve.png")
         plt.close(fig)
 
     if gap_path.exists():
@@ -95,12 +114,11 @@ def plot_data_size_curve():
                     marker="o",
                     linewidth=1.8,
                 )
-                ax.set_title(f"Data-size model gap: ResNet {label} - CNN {label}")
                 ax.set_xlabel("training fraction [%]")
-                ax.set_ylabel(f"{label} gap [ug/m3]")
+                ax.set_ylabel(f"{label} gap [µg/m³]")
                 ax.grid(True, alpha=0.25)
                 fig.tight_layout()
-                fig.savefig(out_dir / f"data_size_{metric}_gap.png", dpi=200)
+                plotting.savefig(fig, out_dir / f"data_size_{metric}_gap.png")
                 plt.close(fig)
     print("wrote ablation data-size figures")
 

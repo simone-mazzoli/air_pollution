@@ -1,7 +1,12 @@
 import os
+import sys
 from pathlib import Path
 
 import pandas as pd
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 _CACHE_DIR = Path(os.environ.get("TMPDIR", "/tmp")) / "matplotlib-cache"
 _CACHE_DIR.mkdir(parents=True, exist_ok=True)
@@ -12,6 +17,12 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
+import report_plot_style
+
+report_plot_style.apply()
+savefig = report_plot_style.savefig
+PALETTE = report_plot_style.PALETTE
 
 
 EXPECTED_FOLDS = [
@@ -153,7 +164,7 @@ def save_objective_loss_curve(history, out_path, title, best_epoch=None, ylim=No
     ax.plot(
         history["epoch"],
         history["train_loss"],
-        color="#1f77b4",
+        color=PALETTE["blue"],
         linewidth=1.8,
         label="train loss",
     )
@@ -161,7 +172,7 @@ def save_objective_loss_curve(history, out_path, title, best_epoch=None, ylim=No
         ax.plot(
             history["epoch"],
             history["val_loss"],
-            color="#9467bd",
+            color=PALETTE["purple"],
             linewidth=1.8,
             label="validation loss",
         )
@@ -176,7 +187,7 @@ def save_objective_loss_curve(history, out_path, title, best_epoch=None, ylim=No
     ax.grid(True, alpha=0.25)
     ax.legend(frameon=False)
     fig.tight_layout()
-    fig.savefig(out_path, dpi=200)
+    savefig(fig, out_path)
     plt.close(fig)
 
 
@@ -192,7 +203,7 @@ def save_performance_curve(history, out_path, title, best_epoch=None, ylim=None)
     ax.plot(
         history["epoch"],
         history[rmse_col],
-        color="#d62728",
+        color=PALETTE["red"],
         linewidth=1.8,
         label="validation RMSE",
     )
@@ -200,7 +211,7 @@ def save_performance_curve(history, out_path, title, best_epoch=None, ylim=None)
         ax.plot(
             history["epoch"],
             history[mae_col],
-            color="#ff7f0e",
+            color=PALETTE["orange"],
             linewidth=1.4,
             alpha=0.9,
             label="validation MAE",
@@ -212,11 +223,11 @@ def save_performance_curve(history, out_path, title, best_epoch=None, ylim=None)
     _mark_best_epoch(ax, history, best_epoch, rmse_col)
     ax.set_title(title)
     ax.set_xlabel("epoch")
-    ax.set_ylabel("validation error [ug/m3]")
+    ax.set_ylabel("validation error [µg/m³]")
     ax.grid(True, alpha=0.25)
     ax.legend(frameon=False)
     fig.tight_layout()
-    fig.savefig(out_path, dpi=200)
+    savefig(fig, out_path)
     plt.close(fig)
 
 
@@ -238,7 +249,7 @@ def save_run_curve(
     axes[0].plot(
         history["epoch"],
         history["train_loss"],
-        color="#1f77b4",
+        color=PALETTE["blue"],
         linewidth=1.8,
         label="train loss",
     )
@@ -246,7 +257,7 @@ def save_run_curve(
         axes[0].plot(
             history["epoch"],
             history["val_loss"],
-            color="#9467bd",
+            color=PALETTE["purple"],
             linewidth=1.8,
             label="validation loss",
         )
@@ -262,7 +273,7 @@ def save_run_curve(
     axes[1].plot(
         history["epoch"],
         history[rmse_col],
-        color="#d62728",
+        color=PALETTE["red"],
         linewidth=1.8,
         label="validation RMSE",
     )
@@ -270,7 +281,7 @@ def save_run_curve(
         axes[1].plot(
             history["epoch"],
             history[mae_col],
-            color="#ff7f0e",
+            color=PALETTE["orange"],
             linewidth=1.2,
             alpha=0.8,
             label="validation MAE",
@@ -280,12 +291,12 @@ def save_run_curve(
 
     _mark_best_epoch(axes[1], history, best_epoch, rmse_col)
     axes[1].set_xlabel("epoch")
-    axes[1].set_ylabel("validation error [ug/m3]")
+    axes[1].set_ylabel("validation error [µg/m³]")
     axes[1].grid(True, alpha=0.25)
     axes[1].legend(frameon=False)
 
     fig.tight_layout()
-    fig.savefig(out_path, dpi=200)
+    savefig(fig, out_path)
     plt.close(fig)
 
 
@@ -324,7 +335,7 @@ def save_objective_summary_grid(
         ax.plot(
             sub["epoch"],
             sub["train_loss"],
-            color="#1f77b4",
+            color=PALETTE["blue"],
             linewidth=1.5,
             label="train loss",
         )
@@ -332,7 +343,7 @@ def save_objective_summary_grid(
             ax.plot(
                 sub["epoch"],
                 sub["val_loss"],
-                color="#9467bd",
+                color=PALETTE["purple"],
                 linewidth=1.5,
                 label="validation loss",
             )
@@ -371,12 +382,8 @@ def save_objective_summary_grid(
             bbox_to_anchor=(0.5, 1.02),
         )
 
-    fig.suptitle(
-        f"{experiment_name}: objective loss by fold ({status})",
-        y=1.08,
-    )
     fig.tight_layout()
-    fig.savefig(out_path, dpi=200, bbox_inches="tight")
+    savefig(fig, out_path)
     plt.close(fig)
 
 
@@ -417,7 +424,7 @@ def save_performance_summary_grid(
         ax.plot(
             sub["epoch"],
             sub[rmse_col],
-            color="#d62728",
+            color=PALETTE["red"],
             linewidth=1.5,
             label="validation RMSE",
         )
@@ -425,7 +432,7 @@ def save_performance_summary_grid(
             ax.plot(
                 sub["epoch"],
                 sub[mae_col],
-                color="#ff7f0e",
+                color=PALETTE["orange"],
                 linewidth=1.2,
                 alpha=0.85,
                 label="validation MAE",
@@ -449,7 +456,7 @@ def save_performance_summary_grid(
 
         ax.set_title(FOLD_LABELS.get(fold, fold))
         ax.set_xlabel("epoch")
-        ax.set_ylabel("validation error [ug/m3]")
+        ax.set_ylabel("validation error [µg/m³]")
         ax.grid(True, alpha=0.25)
 
     for ax in axes.ravel()[len(folds):]:
@@ -465,10 +472,6 @@ def save_performance_summary_grid(
             bbox_to_anchor=(0.5, 1.02),
         )
 
-    fig.suptitle(
-        f"{experiment_name}: validation RMSE/MAE by fold ({status})",
-        y=1.08,
-    )
     fig.tight_layout()
-    fig.savefig(out_path, dpi=200, bbox_inches="tight")
+    savefig(fig, out_path)
     plt.close(fig)

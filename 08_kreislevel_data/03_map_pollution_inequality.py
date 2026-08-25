@@ -37,6 +37,7 @@ from __future__ import annotations
 import argparse
 import sqlite3
 from pathlib import Path
+import sys
 
 import matplotlib
 matplotlib.use("Agg")
@@ -57,6 +58,13 @@ except ImportError as exc:
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+import report_plot_style
+
+report_plot_style.apply()
+savefig = report_plot_style.savefig
 
 DEFAULT_INPUT = (
     ROOT
@@ -92,64 +100,64 @@ MAPS = [
     {
         "column": "mean_pred_pm25",
         "filename": "01_mean_pm25.png",
-        "title": "Mean predicted PM2.5 by Kreis",
-        "legend": "Mean predicted PM2.5 [µg/m³]",
+        "title": "PM$_{2.5}$",
+        "legend": "PM$_{2.5}$ [µg/m³]",
         "cmap": "viridis",
         "log_scale": False,
     },
     {
         "column": "disposable_income_2023_eur_per_capita",
         "filename": "02_disposable_income.png",
-        "title": "Disposable income per capita by Kreis (2023)",
-        "legend": "Disposable income [EUR per capita]",
+        "title": "Income",
+        "legend": "EUR per capita",
         "cmap": "viridis",
         "log_scale": False,
     },
     {
         "column": "unemployment_rate_2024_pct",
         "filename": "03_unemployment.png",
-        "title": "Unemployment rate by Kreis (2024)",
-        "legend": "Unemployment rate [%]",
+        "title": "Unemployment",
+        "legend": "%",
         "cmap": "viridis",
         "log_scale": False,
     },
     {
         "column": "no_vocational_qualification_2022_pct",
         "filename": "04_no_vocational_qualification.png",
-        "title": "Population without vocational qualification by Kreis (2022)",
-        "legend": "No vocational qualification [%]",
+        "title": "No vocational qualification",
+        "legend": "%",
         "cmap": "viridis",
         "log_scale": False,
     },
     {
         "column": "university_degree_2022_pct",
         "filename": "05_university_degree.png",
-        "title": "Population with university degree by Kreis (2022)",
-        "legend": "University degree [%]",
+        "title": "University degree",
+        "legend": "%",
         "cmap": "viridis",
         "log_scale": False,
     },
     {
         "column": "immigration_history_2022_pct",
         "filename": "06_immigration_history.png",
-        "title": "Population with immigration history by Kreis (2022)",
-        "legend": "Immigration history [%]",
+        "title": "Immigration history",
+        "legend": "%",
         "cmap": "viridis",
         "log_scale": False,
     },
     {
         "column": "population_density_2024_per_km2",
         "filename": "07_population_density.png",
-        "title": "Population density by Kreis (2024)",
-        "legend": "Population density [persons per km²] — log color scale",
+        "title": "Population density",
+        "legend": "persons per km², log scale",
         "cmap": "viridis",
         "log_scale": True,
     },
     {
         "column": "share_65plus_2024_pct",
         "filename": "08_share_65plus.png",
-        "title": "Population aged 65+ by Kreis (2024)",
-        "legend": "Population aged 65+ [%]",
+        "title": "Age 65+",
+        "legend": "%",
         "cmap": "viridis",
         "log_scale": False,
     },
@@ -389,7 +397,7 @@ def save_map(
 
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=220, bbox_inches="tight")
+    savefig(fig, out_path)
     plt.close(fig)
 
     print(f"saved {out_path}")
@@ -462,7 +470,7 @@ def save_summary_map_panel(
         ax.set_xlim(xmin, xmax)
         ax.set_ylim(ymin, ymax)
         ax.set_axis_off()
-        ax.set_title(spec["title"], fontsize=10.5, pad=5)
+        ax.set_title(spec["title"], fontsize=12, pad=5)
 
         sm = ScalarMappable(norm=norm, cmap=spec["cmap"])
         sm.set_array([])
@@ -476,30 +484,20 @@ def save_summary_map_panel(
             shrink=0.88,
             aspect=22,
         )
-        cbar.ax.tick_params(labelsize=7)
-        cbar.set_label(spec["legend"], fontsize=7.5)
-
-    fig.suptitle(
-        "Predicted PM2.5 and socioeconomic characteristics across covered Kreise",
-        fontsize=15,
-        y=0.995,
-    )
+        cbar.ax.tick_params(labelsize=8)
+        cbar.set_label(spec["legend"], fontsize=8.5)
 
     fig.subplots_adjust(
         left=0.025,
         right=0.985,
-        top=0.94,
+        top=0.965,
         bottom=0.045,
         wspace=0.10,
         hspace=0.18,
     )
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(
-        out_path,
-        dpi=240,
-        bbox_inches="tight",
-    )
+    savefig(fig, out_path)
     plt.close(fig)
 
     print(f"saved {out_path}")

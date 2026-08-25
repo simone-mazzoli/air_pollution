@@ -6,6 +6,7 @@ Output: data/processed/plots/sensors_map_static_<MONTH>.png
 """
 
 import json
+import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -15,6 +16,13 @@ from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
+import report_plot_style
+
+report_plot_style.apply()
+
 DATA_DIR = BASE_DIR / "data" / "processed" / "daily_avg" / "eea" / "pm_reference_stations_2024.csv"
 OUT_DIR = BASE_DIR / "graphs_and_plots"
 
@@ -66,7 +74,7 @@ def main() -> None:
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     out_path = OUT_DIR / f"sensors_map_static.png"
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    report_plot_style.savefig(fig, out_path)
     print(f"saved -> {out_path}")
 
 

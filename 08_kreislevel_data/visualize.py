@@ -2,15 +2,25 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import sys
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+import report_plot_style
+
+report_plot_style.apply()
+savefig = report_plot_style.savefig
+
 DEFAULT_INPUT = ROOT / "08_kreislevel_data" / "socioeconomic_kreis_2024.csv"
 DEFAULT_OUTDIR = ROOT / "08_kreislevel_data" / "figures" / "socioeconomic"
 
@@ -106,52 +116,33 @@ def save_correlation_matrix(
         )
 
     corr = data.corr(method="pearson")
-    values = corr.to_numpy()
-    n = len(columns)
-
     fig, ax = plt.subplots(figsize=(8.0, 7.0))
-    im = ax.imshow(
-        values,
-        cmap="coolwarm",
+    labels = [SHORT_LABELS[c] for c in columns]
+    sns.heatmap(
+        corr,
+        ax=ax,
+        cmap=report_plot_style.RESIDUAL_CMAP,
         vmin=-1,
         vmax=1,
-        interpolation="none",
-        aspect="equal",
+        center=0,
+        annot=True,
+        fmt=".2f",
+        annot_kws={"fontsize": 9},
+        linewidths=0.25,
+        linecolor="#F3F4F6",
+        square=True,
+        cbar_kws={"label": "Pearson r", "fraction": 0.048, "pad": 0.04},
+        xticklabels=labels,
+        yticklabels=labels,
     )
-
-    labels = [SHORT_LABELS[c] for c in columns]
-    ax.set_xticks(np.arange(n))
-    ax.set_yticks(np.arange(n))
-    ax.set_xticklabels(labels, rotation=35, ha="right")
-    ax.set_yticklabels(labels)
-
-    for i in range(n):
-        for j in range(n):
-            r = values[i, j]
-            ax.text(
-                j,
-                i,
-                f"{r:.2f}",
-                ha="center",
-                va="center",
-                fontsize=9.5,
-                color="white" if abs(r) >= 0.55 else "black",
-            )
-
-    ax.set_xticks(np.arange(-0.5, n, 1), minor=True)
-    ax.set_yticks(np.arange(-0.5, n, 1), minor=True)
-    ax.grid(which="minor", color="white", linewidth=1.4)
-    ax.tick_params(which="minor", bottom=False, left=False)
-
-    for spine in ax.spines.values():
-        spine.set_visible(False)
-
-    cbar = fig.colorbar(im, ax=ax, fraction=0.048, pad=0.04)
-    cbar.set_label("Pearson correlation")
-
-    ax.set_title("Correlation of selected socioeconomic indicators", pad=15)
+    ax.grid(False)
+    ax.tick_params(axis="x", rotation=35)
+    for label in ax.get_xticklabels():
+        label.set_ha("right")
+    ax.tick_params(axis="both", length=0)
+    ax.set_title("")
     fig.tight_layout()
-    fig.savefig(out_path, dpi=220, bbox_inches="tight")
+    savefig(fig, out_path)
     plt.close(fig)
 
 
@@ -218,13 +209,8 @@ def save_indicator_boxplots(
     for ax in axes[n:]:
         ax.axis("off")
 
-    fig.suptitle(
-        "Distribution of selected socioeconomic and demographic indicators",
-        y=1.01,
-        fontsize=13,
-    )
     fig.tight_layout()
-    fig.savefig(out_path, dpi=220, bbox_inches="tight")
+    savefig(fig, out_path)
     plt.close(fig)
 
 

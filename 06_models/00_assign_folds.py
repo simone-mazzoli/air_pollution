@@ -25,6 +25,7 @@ Run:
   python3 00_assign_folds.py --out-csv custom.csv --out-plot custom.png
 """
 import argparse
+import sys
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -32,6 +33,14 @@ import matplotlib
 matplotlib.use("Agg")               # no display needed; write PNG straight to disk
 import matplotlib.pyplot as plt
 from shared import folds, paths
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+import report_plot_style
+
+report_plot_style.apply()
 
 LABELS = paths.LABELS
 OUT_CSV = paths.STATION_FOLD
@@ -132,7 +141,7 @@ def make_plot(df, path):
     ax.grid(True, lw=0.3, alpha=0.4)
     fig.tight_layout()
     path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=140)
+    report_plot_style.savefig(fig, path)
     plt.close(fig)
     print(f"saved {path}")
 
