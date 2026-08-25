@@ -30,5 +30,5 @@ currently fixed to 2024 in the script.
 ## Other Scripts
 | Script | Status | Notes |
 | --- | --- | --- |
-| `download_extract_hyras.py` | experimental | Downloads/extracts HYRAS weather for calibration diagnostics. This can download large NetCDF files. |
 | `04_get_admin_boundaries.py` | optional | Downloads administrative boundaries for later spatial joins. |
+| `05_download_extract_hyras.py` | experimental | Downloads/extracts HYRAS weather for calibration diagnostics. This can download large NetCDF files. |

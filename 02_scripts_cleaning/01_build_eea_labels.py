@@ -12,6 +12,8 @@ min_days = 90%  (--min-frac, default 0.90)
 +
 only valid observations (Validity > 0, value != -999) are kept.
 
+Validity is a variable in the airbase raw parquet, see the airbase documentation for details.
+
 Reuses count_eea_stations.py's duckdb + metadata-join logic.
 Input Coordinates come from the airbase metadata.csv (Longitude/Latitude).
 """

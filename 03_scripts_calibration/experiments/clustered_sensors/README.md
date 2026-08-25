@@ -7,6 +7,10 @@ when we average them together.
 python3 03_scripts_calibration/experiments/clustered_sensors/cluster_test.py
 ```
 
+### Data 
+The script reads `data/processed/` under the repository root.
+
 The retained result table is `cluster_test_results.csv`. The current result is
 still not strong enough to treat clustered sensors as replacements for UBA
 reference stations.
+

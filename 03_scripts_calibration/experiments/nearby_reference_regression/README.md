@@ -12,11 +12,11 @@ an image model.
 
 | Script | What it does |
 | --- | --- |
+| `audit_2024_data_completeness.py` | Checks whether the 2024 inputs are complete enough for these experiments. | 
 | `calibrate_pm_regression_loo.py` | Fits OLS/Huber nearby-reference corrections and writes diagnostic outputs. |
 | `compare_label_construction_methods.py` | Compares raw SDS011, constant mean, percentile/range mapping, OLS, and Huber on the same held-out folds. |
-| `fit_close_reference_weather_models.py` | Tests close-reference daily models with PM, humidity, and temperature. |
 | `eda_close_reference_inventory.py` | Counts close SDS011-UBA pairs and nearby weather coverage. |
-| `audit_2024_data_completeness.py` | Checks whether the 2024 inputs are complete enough for these experiments. |
+| `fit_close_reference_weather_models.py` | Tests close-reference daily models with PM, humidity, and temperature. |
 
 ## Inputs
 
