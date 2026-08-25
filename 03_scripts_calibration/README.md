@@ -1,36 +1,18 @@
 # 03 Calibration
 
-This folder is where we deal with Sensor.Community PM sensors before they are
-used in modeling.
+This folder is where the scripts are kept that we use in our attempt to calibrate the Sensor.Community data. 
 
 Sensor.Community gives us many more locations than UBA stations, but the SDS011
 PM sensors are low-cost devices. We tested whether their readings could be
 corrected well enough to act like official annual PM10/PM2.5 measurements.
 
-## What The Current Pipeline Still Uses
-
-Run from the repository root:
-
-```bash
-python3 03_scripts_calibration/active/04_resolve_sensor_land.py
-python3 03_scripts_calibration/active/03_calibrate_pm_loo.py
-```
-
-| Script | What it does | Main output |
-| --- | --- | --- |
-| `active/04_resolve_sensor_land.py` | Assigns each SDS011 sensor to a German federal state. We use this for geographic train/validation splits. | `data/processed/sensor_land.csv` |
-| `active/03_calibrate_pm_loo.py` | Creates the current annual proxy labels from Sensor.Community data. These are useful for experiments, but they are not proven reference-quality labels. | `data/processed/corrected/fold/*/annual/2024.csv` |
-
-The current ResNet code reads the annual files under
-`data/processed/corrected/fold/`.
-
 ## What The Experiment Folders Contain
 
 | Folder | Why we keep it |
 | --- | --- |
-| `experiments/nearby_reference_regression/` | Tests where nearby UBA stations were used to correct SDS011 readings with OLS, Huber, and weather-aware models. |
 | `experiments/clustered_sensors/` | Tests whether averaging nearby Sensor.Community sensors makes them reliable enough. |
 | `experiments/diagnostics/` | Older checks for input coverage, distance effects, and fold coverage. |
+| `experiments/nearby_reference_regression/` | Tests where nearby UBA stations were used to correct SDS011 readings with OLS, Huber, and weather-aware models. |
 
 We keep these scripts because they support the results summarized in the report.
 They are not needed for a normal current training run.

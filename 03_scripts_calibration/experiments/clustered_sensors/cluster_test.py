@@ -1,6 +1,4 @@
 """
-FINAL VERDICT: are the citizen sensors usable in ANY way?
-
 Three independent questions, each answered directly against co-located UBA
 reference stations (no model, no CV):
 

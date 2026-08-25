@@ -1,8 +1,8 @@
 # 06 Models
 
-This folder contains the modeling part of the air-pollution project. The main
-task here is to predict annual PM2.5 concentration at monitoring stations from
-satellite and environmental data.
+This folder contains the modeling part. The main task here is to predict 
+annual PM2.5 concentration at monitoring stations from satellite and 
+environmental data.
 
 PM2.5 means fine particulate matter with diameter below 2.5 micrometers. It is
 one of the most important air-pollution indicators because small particles can
@@ -17,9 +17,7 @@ bands. Sentinel-5P observes atmospheric gases and aerosols. DEM means digital
 elevation model, which gives terrain height.
 
 The current experiments train on Europe-wide reference stations. Northern and
-eastern Germany are kept as a sealed final test region. "Sealed" means that this
-region is not used for choosing the model architecture, hyperparameters, or
-training settings. It is only used after development choices have been made.
+Eastern Germany are kept as a sealed final test region. 
 
 The final development comparison is frozen:
 

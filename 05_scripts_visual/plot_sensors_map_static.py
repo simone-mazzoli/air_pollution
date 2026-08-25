@@ -19,7 +19,7 @@ DATA_DIR = BASE_DIR / "data" / "processed" / "daily_avg" / "eea" / "pm_reference
 OUT_DIR = BASE_DIR / "graphs_and_plots"
 
 GEOJSON_URL = "https://raw.githubusercontent.com/leakyMirror/map-of-europe/master/GeoJSON/europe.geojson"
-GEOJSON_CACHE = BASE_DIR / "data" / "processed" / "europen_countries.geojson"
+GEOJSON_CACHE = BASE_DIR / "data" / "processed" / "european_countries.geojson"
 
 BBOX_EUROPE = {"lat_min": 34.0, "lat_max": 71.0, "lon_min": -25.0, "lon_max": 46.0}
 MARGIN = 0.3
