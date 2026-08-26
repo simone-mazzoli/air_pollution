@@ -14,37 +14,40 @@ We are parallely testing the signal and validity of the sensors, while also crea
 
 ## 1. Input Data
 
-| Input | Folder/script | Output | Status |
+| Input | Folder/script | Output | 
 | --- | --- | --- | --- |
-| Sensor.Community monthly ZIP files | `01_scripts_gathering/sensors-related/01_sensor_community_all_sensors.py` | `data/raw/<YYYY-MM>/<YYYY-MM>_<sensor_type>.zip` | implemented |
-| UBA station metadata | `01_scripts_gathering/sensors-related/02_uba_stations_metadata.py` | `data/processed/uba_stations_germany.csv` | implemented |
-| UBA daily PM measurements | `01_scripts_gathering/sensors-related/03_download_uba_measurements.py` | `data/processed/daily_avg/uba/pm_reference_stations_2024.csv` | implemented |
-| EEA PM data | `01_scripts_gathering/get_eea_pm.py` | `data/processed/eea/airbase_raw/` | experimental |
-| HYRAS weather | `01_scripts_gathering/download_extract_hyras.py` | `data/processed/daily_weather/hyras_2024_sds011.parquet` | experimental, used for weather diagnostics |
+| Sensor.Community monthly ZIP files | `01_scripts_gathering/sensors-related/01_sensor_community_all_sensors.py` | `data/raw/<YYYY-MM>/<YYYY-MM>_<sensor_type>.zip` | 
+| UBA station metadata | `01_scripts_gathering/sensors-related/02_uba_stations_metadata.py` | `data/processed/uba_stations_germany.csv` | 
+| UBA daily PM measurements | `01_scripts_gathering/sensors-related/03_download_uba_measurements.py` | `data/processed/daily_avg/uba/pm_reference_stations_2024.csv` | 
+| EEA PM data | `01_scripts_gathering/get_eea_pm.py` | `data/processed/eea/airbase_raw/` | 
+| HYRAS weather | `01_scripts_gathering/sensor-related/05_download_extract_hyras.py` | `data/processed/daily_weather/hyras_2024_sds011.parquet` | 
 
 UBA stations are official German reference stations. We use them because their
 measurements are much more reliable than low-cost sensors. Sensor.Community
-gives many more locations, but the PM sensors are noisy.
+gives many more locations, but the PM sensors are noisy. The Hyras weather data 
+is used for the calibration experiment. The EEA PM data provides PM data from 
+all of Europe, which ends up being the training data. 
 
 ## 2. Cleaning And Aggregation
 
-| Step | Folder/script | Output | Status |
+| Step | Folder/script | Output |
 | --- | --- | --- | --- |
-| Clean PM sensors | `02_scripts_cleaning/sensors-related/01_process_pm_sensors.py` | hourly parquet files, daily CSVs, monthly CSVs | implemented |
-| Clean humidity sensors | `02_scripts_cleaning/sensors-related/02_process_humidity_sensors.py` | hourly/daily/monthly humidity tables | implemented |
-| Aggregate UBA PM by month | `02_scripts_cleaning/sensors-related/03_aggregate_uba_monthly.py` | `data/processed/monthly_avg/uba/pm_reference_stations_<YYYY-MM>.csv` | implemented |
-| Assign UBA stations to states | `02_scripts_cleaning/sensors-related/04_locate_DEUB_UBA_stations.py` | `data/processed/uba/station_land.csv` | implemented |
+| Clean PM sensors | `02_scripts_cleaning/sensors-related/01_process_pm_sensors.py` | hourly parquet files, daily CSVs, monthly CSVs | 
+| Clean humidity sensors | `02_scripts_cleaning/sensors-related/02_process_humidity_sensors.py` | hourly/daily/monthly humidity tables | 
+| Aggregate UBA PM by month | `02_scripts_cleaning/sensors-related/03_aggregate_uba_monthly.py` | `data/processed/monthly_avg/uba/pm_reference_stations_<YYYY-MM>.csv` | 
+| Assign UBA stations to states | `02_scripts_cleaning/sensors-related/04_locate_DEUB_UBA_stations.py` | `data/processed/uba/station_land.csv` | 
+| Create daily measurements EEA stations | `02_scripts_clearning/01_build_eea_labels.py` | `data/processed/daily_avg/eea/pm_reference_stations_2024.csv` |
 
 Annual aggregation means averaging daily values into one value per location for
 the year. The current code uses 2024.
 
 ## 3. Reference And Sensor Labels
 
-| Step | Folder/script | Output | Status |
+| Step | Folder/script  | Status |
 | --- | --- | --- | --- |
-| Assign Sensor.Community sensors to states | `03_scripts_calibration/active/04_resolve_sensor_land.py` | `data/processed/sensor_land.csv` | implemented |
-| Build current annual proxy labels | `03_scripts_calibration/active/03_calibrate_pm_loo.py` | `data/processed/corrected/fold/*/annual/2024.csv` | implemented |
-| Summarize sensor calibration experiments | `03_scripts_calibration/build_sensor_calibration_summary.py` | `03_scripts_calibration/sensor_community_calibration_summary.csv` | implemented |
+| Tests whether averaging nearby Sensor.Community sensors makes them reliable enough. | `experiments/clustered_sensors/` | experimental |
+| Older checks for input coverage, distance effects, and fold coverage. | `experiments/diagnostics/` | experimental |
+| Tests where nearby UBA stations were used to correct SDS011 readings with OLS, Huber, and weather-aware models. |`experiments/nearby_reference_regression/` | experimental | 
 
 Calibration means trying to correct a sensor so that its values match a trusted
 reference measurement. We tested several Sensor.Community calibration ideas
@@ -55,19 +58,15 @@ labels. See
 
 Spatial folds are geographic train/validation splits. Here, German states are
 grouped into folds, and `Sachsen-Anhalt` is treated as the sealed test state in
-the current sensor-label workflow. The final reference-station validation design
-is still being evaluated.
+the current sensor-label workflow. The calibration attempt was unsuccesfull and 
+the Sensor.Community data was excluded from training. 
 
 ## 4. Satellite Patch Collection
 
-| Step | Folder/script | Output | Status |
+| Step | Folder/script | Output |
 | --- | --- | --- | --- |
-| Download Sentinel-2 patches for sensor labels | `04_GEE/01_download_satellite_patches.py` | `data/processed/satellite/high_res_multispec/*.npy`, `low_res_multispec/*.npy`, `manifest.csv` | implemented |
-| Inspect downloaded patches | `04_GEE/02_inspect_patches.py` | `data/processed/satellite/preview_patches.png` | implemented |
-| Download Sentinel-5P sensor patches | `04_GEE/03_download_s5p_patches.py` | S5P patch arrays under `data/processed/satellite/` | experimental |
-| Download national Sentinel-5P rasters/crops | `04_GEE/04_download_s5p_nation.py` | national rasters and cropped arrays | experimental |
-| Download Sentinel-2 patches for UBA stations | `04_GEE/05_download_satellite_patches_uba.py` | station-centered Sentinel-2 arrays | implemented/experimental |
-| Download Sentinel-5P patches for UBA stations | `04_GEE/06_download_s5p_patches_uba.py` | station-centered S5P arrays | experimental |
+| Download Sentinel-2 and Sentinel-5P patches and Coperinus elevation for sensor labels | `04_GEE/01_download_eea_patches.py` | `data/processed/satellite_eea/<stream_folder>/<station_code>.npy`, `manifest_<stream>.csv` |
+| Download the same data for test Laender in 10 km grids | `04_GEE/02_download_dense_grid_patches.py` | `data/processed/satellite_grid/<stream_folder>/<grid_id>.npy`, `data/processed/eea/grid_points.csv` | 
 
 Sentinel-2 gives local visual context such as land cover, roads, vegetation, and
 urban structure. Sentinel-5P is coarser but measures atmospheric products such
@@ -123,13 +122,3 @@ Treat it as exploratory until the analysis design is clearer.
 Most scripts look for `data/` at the repository root. `data/` can be a real
 folder or a symlink to an external drive. The repository ignores that directory,
 so team members need to get or generate their own local data.
-
-## Main Known Gaps
-
-- The exact final reference-station training and validation setup is still being
-  evaluated.
-- The current ResNet script trains PM10 only.
-- The low-resolution stream, Sentinel-5P streams, and final map prediction are
-  not fully integrated into the main trainer.
-- `05_scripts_visual/` still expects an older monthly PM filename and may need a
-  small path update before use.

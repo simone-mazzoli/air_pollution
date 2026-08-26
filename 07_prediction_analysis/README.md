@@ -19,7 +19,7 @@ and writes diagnostic figures and tables under:
 Run it after the final sealed TEST prediction file exists:
 
 ```bash
-python3 07_prediction_analysis/analyze_test_predictions.py
+python3 07_prediction_analysis/01_analyze_test_predictions.py
 ```
 
 The map figures use cached vector GeoJSON boundaries, not web map tiles. The

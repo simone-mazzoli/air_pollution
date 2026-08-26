@@ -22,7 +22,7 @@ truth.
 
 | Source | What it is | Why we use it |
 | --- | --- | --- |
-| UBA reference stations | Official German air-quality stations from the Umweltbundesamt. | These are our most trusted PM10/PM2.5 measurements. |
+| UBA reference stations | Official German air-quality stations from the Umweltbundesamt. | We use these as references for the calibration experiments |
 | EEA / AirBase data | European reference-station data and gridded products. | Useful for comparison and possible wider validation. |
 | Sensor.Community | Volunteer low-cost sensors, mostly SDS011 PM sensors plus weather sensors. | Much denser spatial coverage than UBA, but individual readings are noisy. |
 | Sentinel-2 | Optical satellite images with 10-20 m bands. | Gives land cover and local spatial context around each station or sensor. |
@@ -39,7 +39,7 @@ instead of memorizing local patterns.
 Earlier work tried to train mainly on corrected Sensor.Community annual labels.
 Those labels are now treated cautiously. The calibration experiments showed that
 the sensors are useful to investigate, but the tested corrections did not make
-them reference-equivalent annual measurements.
+them reference-equivalent annual measurements, and are therefore excluded from training
 
 ## Repository Structure
 
@@ -51,6 +51,8 @@ them reference-equivalent annual measurements.
 | `04_GEE/` | Download Sentinel-2 and Sentinel-5P patches with Google Earth Engine. |
 | `05_scripts_visual/` | Optional maps for checking sensor and station coverage. |
 | `06_models/02_resnet/` | Current ResNet training and patch-normalization code. |
+| `07_predictions_analysis`| Analyses the test set predictions| 
+| `08_kreislevel_data`| Downloads and analyses the kreislevel socio-economic data|
 
 ## Setup On A New Computer
 
@@ -109,31 +111,10 @@ summary, not raw data.
 3. Assign UBA stations and Sensor.Community sensors to German federal states.
 4. Build annual labels used by the current modeling experiments.
 5. Download Sentinel image patches for those locations.
-6. Normalize patches and train the ResNet baseline.
+6. Normalize patches and train the ResNet  and the CNN baseline.
 7. Compare predictions against geographically held-out reference stations.
 
 See [PIPELINE_OVERVIEW.md](PIPELINE_OVERVIEW.md) for the longer version.
-
-## Project Status
-
-Implemented:
-
-- 2024 Sensor.Community and UBA data gathering.
-- PM and humidity cleaning.
-- Sensor and station state assignment.
-- Current annual proxy-label generation.
-- Sentinel patch download for sensor/station locations.
-- A high-resolution ResNet PM10 baseline.
-
-Still under evaluation or planned:
-
-- Whether Sensor.Community helps as weak labels. A weak label is a noisy label
-  that may still help training if the final model improves on held-out reference
-  stations.
-- Final reference-station training/evaluation design.
-- Continuous gridded prediction.
-- Comparison with EEA gridded products.
-- Socioeconomic or environmental-justice analysis.
 
 ## Where To Read More
 
