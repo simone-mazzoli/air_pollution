@@ -56,7 +56,8 @@ scratch CNN shows what can be learned directly from the pollution dataset.
   validation metrics are written to the matching experiment folder.
 - `02_train_final.py` trains one final model on all development folds. Before
   training, it removes development stations that are within 100 km of the sealed
-  TEST stations.
+  TEST stations. For the selected `cnn_deep_wide` model, the final epoch count
+  is read from the saved pre-TEST model-selection record.
 - `03_predict_test.py` loads the final checkpoint and evaluates the sealed
   northern/eastern Germany TEST stations.
 - `run_experiment_suite.py` is the final development-suite entry point. It runs
@@ -127,8 +128,9 @@ The steps are:
   SmoothL1 objective loss. RMSE/MAE are plotted separately in original PM2.5
   units.
 - `02_train_final.py`: after one experiment has been chosen, trains a fresh
-  model for that experiment on all development folds using the CV-derived epoch
-  count. Fold models are not merged.
+  model for that experiment on all development folds. For `cnn_deep_wide`, it
+  uses `results/cnn_deep_wide/final_model_selection.json` so the final epoch
+  count stays at the recorded pre-TEST value. Fold models are not merged.
 - `03_predict_test.py`: evaluates that one selected final checkpoint on the
   sealed TEST stations.
 
@@ -455,7 +457,8 @@ effective values at startup so the runtime setting can be checked.
 CV training can run for up to `CV_EPOCHS` epochs. Early stopping watches the
 mean validation RMSE across configured pollutants. `best_epoch` is the one-based
 epoch number with the best validation RMSE. Final training does not use a held
-out fold; its epoch count is the ceiling of the median CV `best_epoch` values.
+out fold. For the saved `cnn_deep_wide` final model, the epoch count is fixed in
+`results/cnn_deep_wide/final_model_selection.json`.
 
 Each CV epoch also prints a compact timing line for the training pass, average
 training batch time, train-subset evaluation, validation evaluation with the
@@ -514,7 +517,8 @@ results/resnet_full/     supplementary fold1_iberia fine-tuning diagnostic
 ```
 
 Superseded `resnet/` and `resnet_layer4/` outputs are archived under
-`results/archive/historical/`. They are provenance, not active report results.
+`results/archive/historical/`. They are kept as history, not active report
+results.
 
 Each experiment folder can contain:
 
@@ -532,7 +536,9 @@ Each experiment folder can contain:
   information, and run timestamps;
 - `final_model.pt`: the final checkpoint plus normalization values, S5P
   training statistics, baseline concentration, buffer metadata, parameter
-  counts, and CV-derived epoch information;
+  counts, and recorded pre-TEST epoch information;
+- `final_model_selection.json`: records why the final `cnn_deep_wide`
+  checkpoint used 24 epochs;
 - `test_predictions.csv`: sealed TEST predictions with station metadata.
 
 This metadata matters because a result is only interpretable when we know which
@@ -556,7 +562,7 @@ results/summary/iberia_diagnostics.csv
 ```
 
 Use `python3 06_models/summarize_cv_results.py --all-existing` for the
-classified provenance summary under `results/summary/all_existing/`.
+classified history summary under `results/summary/all_existing/`.
 
 Generated checkpoints and large result files should usually stay out of Git
 unless they are intentionally needed for hand-in or reproducibility.
@@ -597,7 +603,7 @@ It currently checks:
 - epoch-history, fold-summary, and run-metadata serialization;
 - summary-table behavior with complete and incomplete result folders;
 - separate result paths for each experiment;
-- the CV-derived final epoch rule;
+- the recorded final epoch rule;
 - frozen ResNet trainability;
 - full-backbone ResNet trainability;
 - pretrained BatchNorm freezing;

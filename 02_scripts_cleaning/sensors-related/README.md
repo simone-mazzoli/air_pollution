@@ -9,6 +9,7 @@ Not used in the final model -- see `../README.md` for the EEA branch that is.
 | `02_process_humidity_sensors.py` | Cleans humidity/weather sensors and creates hourly/daily/monthly humidity tables. | `data/processed/hourly/humidity/`, `data/processed/daily_avg/humidity/`, `data/processed/monthly_avg/humidity/` |
 | `03_aggregate_uba_monthly.py` | Aggregates daily UBA reference data to monthly station means. | `data/processed/monthly_avg/uba/pm_reference_stations_<YYYY-MM>.csv` |
 | `04_locate_DEUB_UBA_stations.py` | Assigns each UBA station to a German federal state. | `data/processed/uba/station_land.csv` |
+| `05_resolve_sensor_land.py` | Assigns SDS011 sensor locations to German federal states and excludes coordinates outside Germany. | `data/processed/sensor_land.csv` |
 
 ## Usual Order
 ```bash
@@ -16,6 +17,7 @@ python3 02_scripts_cleaning/sensors-related/01_process_pm_sensors.py
 python3 02_scripts_cleaning/sensors-related/02_process_humidity_sensors.py
 python3 02_scripts_cleaning/sensors-related/03_aggregate_uba_monthly.py
 python3 02_scripts_cleaning/sensors-related/04_locate_DEUB_UBA_stations.py
+python3 02_scripts_cleaning/sensors-related/05_resolve_sensor_land.py
 ```
 For a smaller test run:
 ```bash
@@ -40,3 +42,6 @@ PM2.5.
   humidity sensors.
 - UBA station-state assignment may fetch German state boundaries if
   `data/processed/germany_states.geojson` is missing.
+- Sensor state assignment also reads `data/processed/germany_states.geojson`.
+  Points just outside a state boundary can be accepted with a small distance
+  tolerance. Points farther outside Germany are left out of `sensor_land.csv`.

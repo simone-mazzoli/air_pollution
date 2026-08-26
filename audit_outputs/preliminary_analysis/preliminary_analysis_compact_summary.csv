@@ -1,0 +1,13 @@
+station_area,n,mean,median,section,station_code,annual_pm25,valid_pm25_days
+rural,175.0,8.57549812842169,7.587770220597638,development_area_summary,,,
+rural-nearcity,39.0,10.03103688556168,9.515519417106654,development_area_summary,,,
+rural-regional,46.0,6.993507914710644,6.991984136351197,development_area_summary,,,
+rural-remote,9.0,5.850083298405943,5.374295713307319,development_area_summary,,,
+suburban,449.0,9.889575113406226,9.034166827112175,development_area_summary,,,
+urban,1151.0,12.08650369226423,10.73240469438406,development_area_summary,,,
+rural,,,,selected_examples,FI00356,1.766934171682823,365.0
+rural-regional,,,,selected_examples,FI00427,1.93367908458808,364.0
+rural,,,,selected_examples,SE0005R,2.549657183180323,365.0
+urban,,,,selected_examples,TR0049A,49.00577017408457,347.0
+urban,,,,selected_examples,RS0055A,41.31696448730704,366.0
+urban,,,,selected_examples,RS0030A,36.00295118963324,365.0

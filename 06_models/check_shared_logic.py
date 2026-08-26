@@ -370,6 +370,22 @@ def check_masked_loss_logging_objective():
     assert torch.isclose(training.masked_loss(pred, y, mask, lossf), expected)
 
 
+def check_final_model_selection_record():
+    script = Path(__file__).with_name("02_train_final.py")
+    spec = importlib.util.spec_from_file_location("train_final", script)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    result = result_paths("cnn_deep_wide")
+    summary = module.final_epoch_summary_from_selection(
+        result["final_model_selection"],
+        "cnn_deep_wide",
+        folds.FOLD_ORDER,
+    )
+    assert summary["best_epochs"] == [16, 22, 25, 25, 20, 42, 34, 22]
+    assert summary["median_best_epoch"] == 23.5
+    assert summary["final_epochs"] == 24
+
+
 def main():
     runtime.apply_runtime_config()
     assert torch.get_num_threads() == CPU_THREADS
@@ -383,6 +399,7 @@ def main():
     check_configured_pollutant_filtering()
     check_joint_target_masks()
     check_masked_loss_logging_objective()
+    check_final_model_selection_record()
 
     train = pd.DataFrame({
         "station_code": ["near", "far"],

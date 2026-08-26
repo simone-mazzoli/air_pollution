@@ -1,0 +1,3 @@
+figure,lower_percentile,upper_percentile,lower_value,upper_value,rgb_indices
+high_res,2,98,151.0,1814.0,"2,1,0"
+low_res,2,98,147.0,1319.0,"2,1,0"

@@ -35,7 +35,7 @@ those as the current final TEST result.
 histories, folds, predictions, results JSON, and metadata before replacing them
 with reruns that include validation objective loss.
 
-Archived results are scientific provenance. They should not be used as the
+Archived results are kept as experiment history. They should not be used as the
 default final comparison.
 
 ## Summary Outputs
@@ -55,7 +55,7 @@ summary/supplementary_full_cv.csv
 summary/iberia_diagnostics.csv
 ```
 
-Optional classified provenance summary:
+Optional classified history summary:
 
 ```bash
 python3 06_models/summarize_cv_results.py --all-existing
@@ -83,8 +83,30 @@ Each experiment directory may contain:
 The selected final checkpoint and current TEST predictions stay in:
 
 ```text
+cnn_deep_wide/final_model_selection.json
 cnn_deep_wide/final_model.pt
 cnn_deep_wide/test_predictions.csv
 ```
 
-Do not move or overwrite those files during development-suite reruns.
+`final_model_selection.json` records the pre-TEST decision that fixed final
+training at 24 epochs. Do not move or overwrite these files during
+development-suite reruns.
+
+## Main Files Used In The Report
+
+```text
+Final selected model:
+  cnn_deep_wide
+
+Main CV comparison used in the report:
+  summary/main_model_comparison.csv
+
+Model-selection record for final training:
+  cnn_deep_wide/final_model_selection.json
+
+Final selected checkpoint:
+  cnn_deep_wide/final_model.pt
+
+Saved TEST predictions:
+  cnn_deep_wide/test_predictions.csv
+```

@@ -1,8 +1,8 @@
 """
-sensor coverage check for each fold to decide which state should be out test
+sensor coverage check for each fold to decide which state should be our test
 
 Input:  data/processed/germany_states.geojson
-        data/processed/sensor_land.csv       (from resolve_sensor_land.py; location, land)
+        data/processed/sensor_land.csv       (from 02_scripts_cleaning/sensors-related/05_resolve_sensor_land.py)
 Output: printed comparison table, no file saved
 """
 
@@ -20,8 +20,7 @@ CORR_FOLD_DIR = PROC / "corrected" / "fold"
 METRIC_CRS = "EPSG:3035"  # ETRS89-LAEA Europe -- equal-area, correct for this
 RADII_KM = [10, 15]
 
-# must match LAND_TO_FOLD in active/03_calibrate_pm_loo.py exactly -- these
-# are the fold groups the calibration was actually fit against
+# These are the fold groups the calibration was actually fit against.
 LAND_TO_FOLD = {
     "Berlin": "Berlin-Brandenburg", "Brandenburg": "Berlin-Brandenburg",
     "Bremen": "Bremen-Niedersachsen", "Niedersachsen": "Bremen-Niedersachsen",
@@ -70,13 +69,14 @@ def load_land_polygons():
 def load_sensors_with_fold():
     if not SENSOR_LAND_PATH.exists():
         raise FileNotFoundError(
-            f"missing {SENSOR_LAND_PATH} -- run resolve_sensor_land.py first"
+            f"missing {SENSOR_LAND_PATH} -- run "
+            "02_scripts_cleaning/sensors-related/05_resolve_sensor_land.py first"
         )
     sensors = pd.read_csv(SENSOR_LAND_PATH)
     if "land" not in sensors.columns:
         raise KeyError(
             f"{SENSOR_LAND_PATH} has no 'land' column (found: {list(sensors.columns)}) "
-            f"-- check resolve_sensor_land.py's output"
+            "-- check 02_scripts_cleaning/sensors-related/05_resolve_sensor_land.py output"
         )
 
     sensors["fold"] = sensors["land"].map(LAND_TO_FOLD)
@@ -87,8 +87,8 @@ def load_sensors_with_fold():
               f"sensors will be excluded from every candidate's count below")
 
     if "lat" not in sensors.columns or "lon" not in sensors.columns:
-        # sensor_land.csv (from resolve_sensor_land.py) only has location/land --
-        # pull coordinates from the same source it itself reads from. Lat/lon are
+        # sensor_land.csv may only have location/land, so pull coordinates from
+        # the same source it reads from. Lat/lon are
         # identical across every fold's annual file for a given location, so any
         # one fold's file has everything needed here.
         annual_files = sorted(CORR_FOLD_DIR.glob("*/annual/*.csv"))

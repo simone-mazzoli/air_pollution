@@ -1,0 +1,13 @@
+split,station_area,n
+development_cv,rural,175
+development_cv,rural-nearcity,39
+development_cv,rural-regional,46
+development_cv,rural-remote,9
+development_cv,suburban,449
+development_cv,urban,1151
+held_out_test,rural,18
+held_out_test,rural-nearcity,3
+held_out_test,rural-regional,13
+held_out_test,rural-remote,5
+held_out_test,suburban,31
+held_out_test,urban,94

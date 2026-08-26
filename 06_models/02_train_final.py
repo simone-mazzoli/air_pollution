@@ -1,4 +1,5 @@
 import argparse
+import json
 from pathlib import Path
 
 import numpy as np
@@ -6,8 +7,35 @@ import torch
 import torch.nn as nn
 
 from shared import data, evaluation, folds, runtime, training
-from shared.config import CACHE_PATCHES, DEVICE, MODEL, SEED, result_paths, training_config
+from shared.config import CACHE_PATCHES, DEVICE, SEED, result_paths, training_config
 from shared.models import SUPPORTED_EXPERIMENTS, require_single_experiment, selected_model
+
+
+def final_epoch_summary_from_selection(selection_path, experiment_name, expected_folds):
+    if not selection_path.exists():
+        raise SystemExit(
+            f"ERROR: final model-selection record not found: {selection_path}. "
+            "Do not derive final epochs from a later CV rerun."
+        )
+    record = json.loads(selection_path.read_text())
+    if record.get("selected_architecture") != experiment_name:
+        raise SystemExit(
+            f"ERROR: {selection_path} selects {record.get('selected_architecture')!r}, "
+            f"not {experiment_name!r}."
+        )
+    by_fold = record.get("original_best_epochs_by_fold", {})
+    missing = [fold for fold in expected_folds if fold not in by_fold]
+    if missing:
+        raise SystemExit(f"ERROR: model-selection record is missing folds: {missing}")
+    fold_best_epochs = [(fold, int(by_fold[fold])) for fold in expected_folds]
+    return {
+        "final_epochs": int(record["fixed_final_epochs"]),
+        "best_epochs": [epoch for _, epoch in fold_best_epochs],
+        "fold_best_epochs": fold_best_epochs,
+        "median_best_epoch": float(record["median_best_epoch"]),
+        "epoch_selection_rule": "recorded_before_test_median_ceil",
+        "epoch_source": str(selection_path),
+    }
 
 
 def print_final_training_setup(epoch_summary, buffer_km, n_before_buffer, buffer_removed, loader_info):
@@ -18,6 +46,7 @@ def print_final_training_setup(epoch_summary, buffer_km, n_before_buffer, buffer
     for fold, best_epoch in epoch_summary["fold_best_epochs"]:
         print(f"  {fold:<{width}}: {best_epoch}")
     print(f"\nMedian CV best epoch: {epoch_summary['median_best_epoch']:g}")
+    print(f"Epoch record: {epoch_summary['epoch_source']}")
     print("Epoch selection rule: ceil(median)")
     print(f"Final training epochs: {epoch_summary['final_epochs']}")
     print(f"\nDevelopment stations before TEST buffer: {n_before_buffer}")
@@ -29,7 +58,7 @@ def print_final_training_setup(epoch_summary, buffer_km, n_before_buffer, buffer
 def parse_args():
     choices = "{" + ",".join(SUPPORTED_EXPERIMENTS) + "}"
     ap = argparse.ArgumentParser(description="Train one selected experiment on all development folds.")
-    ap.add_argument("--experiment", default=MODEL, metavar=choices)
+    ap.add_argument("--experiment", default="cnn_deep_wide", metavar=choices)
     ap.add_argument("--wide", action="store_true",
                     help="use wider scratch-CNN channels with --experiment cnn or cnn_deep")
     return ap.parse_args()
@@ -43,8 +72,8 @@ def main():
     data.seed_everything()
     build_model, model_config = selected_model(experiment_name, wide=args.wide)
     result = result_paths(model_config["experiment"])
-    epoch_summary = training.final_epoch_summary_from_cv(
-        result["cv_results"], folds.development_fold_names())
+    epoch_summary = final_epoch_summary_from_selection(
+        result["final_model_selection"], model_config["experiment"], folds.development_fold_names())
     final_epochs = epoch_summary["final_epochs"]
     cv_best_epochs = epoch_summary["best_epochs"]
     epoch_rule = epoch_summary["epoch_selection_rule"]

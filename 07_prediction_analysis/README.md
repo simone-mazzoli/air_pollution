@@ -19,14 +19,14 @@ and writes diagnostic figures and tables under:
 Run it after the final sealed TEST prediction file exists:
 
 ```bash
-python3 07_prediction_analysis/analyze_test_predictions.py
+python3 07_prediction_analysis/01_analyze_test_predictions.py
 ```
 
 The map figures use cached vector GeoJSON boundaries, not web map tiles. The
 script can cache them once with:
 
 ```bash
-python3 07_prediction_analysis/analyze_test_predictions.py --download-boundaries
+python3 07_prediction_analysis/01_analyze_test_predictions.py --download-boundaries
 ```
 
 The cached files live in `07_prediction_analysis/boundaries/`. Country outlines
@@ -61,7 +61,13 @@ the TEST-set mean, which is only a mathematical reference for that held-out set.
 The training-mean baseline is different: it is a deployable baseline derived
 from the final training data only.
 
-Later, dense prediction maps and comparison to an external EEA modeled PM2.5
-product can be added in separate subfolders such as `dense_prediction/` and
-`eea_comparison/`. That comparison should stay qualitative and external; it
-should not become a target for tuning the model.
+The dense-grid prediction has already been run for `cnn_deep_wide`. The saved
+CSV is:
+
+```text
+07_prediction_analysis/grid_results/cnn_deep_wide_grid_predictions.csv
+```
+
+Comparison to an external EEA modeled PM2.5 product can be added later. That
+comparison should stay qualitative and external. It should not become a target
+for tuning the model.

@@ -1,0 +1,7 @@
+example_group,station_code,land,station_area,annual_pm25,valid_pm25_days,high_res_array_path,usable,skip_reason,shape,finite_fraction,rgb_positive_fraction,rgb_p01,rgb_p99,rgb_dynamic_p99_p01
+low,DEBW031,Baden-Wuerttemberg,rural-regional,3.1259075106010807,366,data/processed/satellite_eea/high_res_multispec/DEBW031.npy,True,,120x120x10,1.0,1.0,114.99000000000001,858.0,743.01
+low,DEUB004,Baden-Wuerttemberg,rural-regional,4.127725520795408,366,data/processed/satellite_eea/high_res_multispec/DEUB004.npy,True,,120x120x10,1.0,1.0,116.0,1036.0400000000081,920.0400000000081
+low,DEBW087,Baden-Wuerttemberg,rural-regional,4.2771317936236,366,data/processed/satellite_eea/high_res_multispec/DEBW087.npy,True,,120x120x10,1.0,1.0,374.5,1333.010000000002,958.510000000002
+high,DERP003,Rheinland-Pfalz,urban,11.66762497148605,365,data/processed/satellite_eea/high_res_multispec/DERP003.npy,True,,120x120x10,1.0,1.0,264.0,2176.0,1912.0
+high,DENW208,Nordrhein-Westfalen,urban,11.152023958791544,365,data/processed/satellite_eea/high_res_multispec/DENW208.npy,True,,120x120x10,1.0,1.0,334.0,2728.0,2394.0
+high,DEBY118,Bayern,urban,10.975207023980104,366,data/processed/satellite_eea/high_res_multispec/DEBY118.npy,True,,120x120x10,1.0,1.0,201.0,2800.0,2599.0

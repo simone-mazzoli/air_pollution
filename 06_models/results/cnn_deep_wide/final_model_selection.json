@@ -1,0 +1,38 @@
+{
+  "selected_architecture": "cnn_deep_wide",
+  "selection_timing": "model was selected before the TEST set was opened",
+  "original_selection_result_file": "06_models/results/archive/pre_val_loss_rerun/cnn_deep_wide/eea_cv_results.json",
+  "original_best_epochs_by_fold": {
+    "fold1_iberia": 16,
+    "fold2_france": 22,
+    "fold3_italy": 25,
+    "fold4_alpine": 25,
+    "fold5_north": 20,
+    "fold6_balkan_e": 42,
+    "fold7_balkan_s": 34,
+    "fold8_poland": 22
+  },
+  "original_eight_best_epochs": [16, 22, 25, 25, 20, 42, 34, 22],
+  "median_best_epoch": 23.5,
+  "fixed_final_epochs": 24,
+  "original_comparison_result": {
+    "file": "06_models/results/summary/pre_val_loss_rerun_comparison.csv",
+    "cnn_deep_wide_pooled_cv_rmse": 3.745917800922522,
+    "compact_cnn_pooled_cv_rmse": 3.797126999941868
+  },
+  "later_reproducibility_rerun_result": {
+    "file": "06_models/results/summary/main_model_comparison.csv and 06_models/results/summary/pre_val_loss_rerun_comparison.csv",
+    "cnn_deep_wide_pooled_cv_rmse": 3.822866467296536,
+    "compact_cnn_pooled_cv_rmse": 3.80871455731511
+  },
+  "note": "The later rerun did not change the model choice because cnn_deep_wide had already been selected before TEST evaluation.",
+  "final_development_n_before_test_buffer": 1869,
+  "stations_removed_by_test_buffer": 74,
+  "final_training_n": 1795,
+  "final_epochs": 24,
+  "verified_against": [
+    "06_models/results/cnn_deep_wide/final_model.pt",
+    "06_models/results/summary/pre_val_loss_rerun_comparison.csv",
+    "06_models/results/summary/main_model_comparison.csv"
+  ]
+}

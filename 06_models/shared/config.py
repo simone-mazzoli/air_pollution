@@ -41,6 +41,7 @@ def result_paths(experiment):
         "cv_history": result_dir / "cv_history.csv",
         "cv_folds": result_dir / "cv_folds.csv",
         "run_metadata": result_dir / "run_metadata.json",
+        "final_model_selection": result_dir / "final_model_selection.json",
         "final_checkpoint": result_dir / "final_model.pt",
         "test_predictions": result_dir / "test_predictions.csv",
     }

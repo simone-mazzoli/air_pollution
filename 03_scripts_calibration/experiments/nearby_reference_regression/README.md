@@ -28,6 +28,9 @@ These scripts expect processed data such as:
 - `data/processed/uba/station_land.csv`
 - `data/processed/sensor_land.csv`
 
+`sensor_land.csv` is created by
+`02_scripts_cleaning/sensors-related/05_resolve_sensor_land.py`.
+
 They default to `data/processed/` under the repository root. Most scripts also
 accept `--processed-dir` if your processed data live somewhere else.
 

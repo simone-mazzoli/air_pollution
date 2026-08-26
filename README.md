@@ -30,11 +30,14 @@ truth.
 
 ## Current Approach
 
-The current baseline trains a ResNet model on Sentinel image patches. A patch is
-a small satellite image window centered on a measurement location. We validate
-geographically: some German federal states are left out during training and used
-for validation. This helps us test whether the model generalizes to new regions
-instead of memorizing local patterns.
+The final model branch trains on official EEA reference-station labels and
+predicts annual PM2.5. The selected model is `cnn_deep_wide`, a scratch CNN that
+uses Sentinel-2 patches, Sentinel-5P context, and elevation data. A patch is a
+small satellite image window centered on a measurement location.
+
+We validate geographically with European folds during development. Northern and
+eastern Germany are kept as a sealed TEST region. This helps us test whether the
+model generalizes to new regions instead of memorizing local patterns.
 
 Earlier work tried to train mainly on corrected Sensor.Community annual labels.
 Those labels are now treated cautiously. The calibration experiments showed that
@@ -46,11 +49,14 @@ them reference-equivalent annual measurements.
 | Folder | What happens there |
 | --- | --- |
 | `01_scripts_gathering/` | Download raw Sensor.Community, UBA, EEA, HYRAS, and related external data. |
-| `02_scripts_cleaning/` | Convert raw downloads into hourly, daily, monthly, and annual tables. |
-| `03_scripts_calibration/` | Assign sensors to German states, make current proxy labels, and keep calibration experiments. |
+| `02_scripts_cleaning/` | Convert raw downloads into hourly, daily, monthly, and annual tables, including sensor state assignment. |
+| `03_scripts_calibration/` | Keep Sensor.Community calibration experiments and their summaries. |
 | `04_GEE/` | Download Sentinel-2 and Sentinel-5P patches with Google Earth Engine. |
 | `05_scripts_visual/` | Optional maps for checking sensor and station coverage. |
-| `06_models/02_resnet/` | Current ResNet training and patch-normalization code. |
+| `06_models/` | Current EEA reference-station model training, saved results, and TEST prediction code. |
+| `07_prediction_analysis/` | TEST diagnostics and dense-grid prediction outputs. |
+| `08_kreislevel_data/` | Exploratory Kreis-level socioeconomic analysis. |
+| `Air_pollution_report/` | Current LaTeX report files and report figures. |
 
 ## Setup On A New Computer
 
@@ -104,13 +110,15 @@ summary, not raw data.
 
 ## Short Pipeline
 
-1. Download Sensor.Community and UBA/EEA data.
-2. Clean the raw sensor archives into hourly, daily, and monthly tables.
-3. Assign UBA stations and Sensor.Community sensors to German federal states.
-4. Build annual labels used by the current modeling experiments.
-5. Download Sentinel image patches for those locations.
-6. Normalize patches and train the ResNet baseline.
-7. Compare predictions against geographically held-out reference stations.
+The project now has two main branches:
+
+1. Sensor.Community branch: clean low-cost sensor data, assign sensors to German
+   states, run calibration experiments, and conclude that the tested annual
+   labels are not used as final CNN training labels.
+2. Final modeling branch: use EEA reference stations plus satellite and context
+   data, run geographic CV, select `cnn_deep_wide`, evaluate the sealed TEST
+   region, predict a dense grid, and run an exploratory Kreis-level
+   socioeconomic analysis.
 
 See [PIPELINE_OVERVIEW.md](PIPELINE_OVERVIEW.md) for the longer version.
 
@@ -123,20 +131,25 @@ Implemented:
 - Sensor and station state assignment.
 - Current annual proxy-label generation.
 - Sentinel patch download for sensor/station locations.
-- A high-resolution ResNet PM10 baseline.
+- Geographic CV on EEA reference stations.
+- Final selected `cnn_deep_wide` PM2.5 model.
+- Sealed TEST evaluation.
+- Dense-grid PM2.5 prediction.
+- Exploratory Kreis-level socioeconomic analysis.
 
 Still under evaluation or planned:
 
 - Whether Sensor.Community helps as weak labels. A weak label is a noisy label
   that may still help training if the final model improves on held-out reference
   stations.
-- Final reference-station training/evaluation design.
-- Continuous gridded prediction.
 - Comparison with EEA gridded products.
-- Socioeconomic or environmental-justice analysis.
+- High-versus-low PM patch examples for the report, which need data stored on
+  the university server.
 
 ## Where To Read More
 
 - [PIPELINE_OVERVIEW.md](PIPELINE_OVERVIEW.md): full workflow and current status.
+- [REPRODUCIBILITY.md](REPRODUCIBILITY.md): what can be checked from this
+  checkout and what needs external data.
 - [03_scripts_calibration/SENSOR_COMMUNITY_CALIBRATION_SUMMARY.md](03_scripts_calibration/SENSOR_COMMUNITY_CALIBRATION_SUMMARY.md): what we learned from the sensor calibration tests.
-- [06_models/02_resnet/README.md](06_models/02_resnet/README.md): current model training code.
+- [06_models/README.md](06_models/README.md): current model training code.

@@ -1,0 +1,3 @@
+split,stations,pm25_day_min,pm25_day_p25,pm25_day_median,pm25_day_mean,pm25_day_p75,pm25_day_max,below_pm25_threshold,pm10_or_only_cases,max_annual_pm25_abs_diff
+development_cv,1869,6,354.0,363.0,352.70251471375065,366.0,366,96,96,1.8768138900782105e-06
+held_out_test,164,151,364.0,366.0,356.0365853658537,366.0,366,12,12,1.6199830277230376e-07
