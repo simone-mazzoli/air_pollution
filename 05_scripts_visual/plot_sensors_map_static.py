@@ -1,7 +1,7 @@
 """
 Plots the EEA stations on a map of Europe.
 Input:  data/processed/monthly_avg/humidity/all_sensors/<MONTH>.csv
-Output: data/processed/plots/sensors_map_static_<MONTH>.png
+Output: Air_pollution_report/Figures/generated/sensors_map_static.png
         data/processed/germany_states.geojson (cached background, fetched once)
 """
 
@@ -24,7 +24,7 @@ import report_plot_style
 report_plot_style.apply()
 
 DATA_DIR = BASE_DIR / "data" / "processed" / "daily_avg" / "eea" / "pm_reference_stations_2024.csv"
-OUT_DIR = BASE_DIR / "graphs_and_plots"
+OUT_DIR = BASE_DIR / "Air_pollution_report" / "Figures" / "generated"
 
 GEOJSON_URL = "https://raw.githubusercontent.com/leakyMirror/map-of-europe/master/GeoJSON/europe.geojson"
 GEOJSON_CACHE = BASE_DIR / "data" / "processed" / "european_countries.geojson"
@@ -64,7 +64,7 @@ def main() -> None:
     draw_state_borders(ax, geojson)
 
     ax.scatter(pm["lon"], pm["lat"], s=8, c="tab:green", alpha=0.5, linewidths=0,
-               zorder=2, label=f"low-qual PM sensors ({len(pm)})")
+               zorder=2, label=f"EEA PM stations ({len(pm)})")
 
     ax.set_xlim(BBOX_EUROPE["lon_min"] - MARGIN, BBOX_EUROPE["lon_max"] + MARGIN)
     ax.set_ylim(BBOX_EUROPE["lat_min"] - MARGIN, BBOX_EUROPE["lat_max"] + MARGIN)

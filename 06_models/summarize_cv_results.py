@@ -13,7 +13,7 @@ def parse_args():
 def main():
     args = parse_args()
     summary = summarize_all_existing() if args.all_existing else summarize_report_tables()
-    out_label = "06_models/results/summary/all_existing" if args.all_existing else "06_models/results/summary"
+    out_label = "06_models/results/archive/historical_result_inventory" if args.all_existing else "06_models/results/summary"
     available = sorted(set(summary["available"]))
     print(f"available experiments: {available}")
     print(f"missing experiments: {summary['missing']}")

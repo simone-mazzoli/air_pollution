@@ -288,8 +288,8 @@ def write_pipeline_figure(rows: list[dict[str, str]]) -> None:
         rows,
         "pipeline_overview_compact.pdf",
         script="09_report_figures/build_report_figures.py",
-        inputs="same logical stages as `Air_pollution_report/Figures/graphs_and_plots/drawio.jpg`",
-        source=rel(REPORT / "Figures" / "graphs_and_plots" / "drawio.jpg"),
+        inputs="project pipeline stages documented in `PIPELINE_OVERVIEW.md`",
+        source="PIPELINE_OVERVIEW.md",
         status="redesigned with fixed node coordinates and orthogonal routes; PNG preview also exported",
     )
 
@@ -701,42 +701,6 @@ def write_dense_prediction_residual_maps(rows: list[dict[str, str]]) -> None:
     )
 
 
-def has_urban_rural_source() -> tuple[bool, str]:
-    candidates = [
-        ROOT / "data" / "processed" / "daily_avg" / "eea" / "pm_reference_stations_2024.csv",
-        ROOT / "06_models" / "results" / "cnn_deep_wide" / "test_predictions.csv",
-    ]
-    fields = (
-        "urban",
-        "rural",
-        "station_type",
-        "station_type_label",
-        "station_setting",
-        "station_setting_label",
-        "area_type",
-        "site_type",
-    )
-    for path in candidates:
-        if not path.exists():
-            continue
-        header = path.read_text(encoding="utf-8", errors="ignore").splitlines()[0].lower()
-        if any(field in header for field in fields):
-            return True, rel(path)
-    return False, "no available CSV contains an explicit urban/rural or station-setting field"
-
-
-def has_patch_source() -> tuple[bool, str]:
-    labels = ROOT / "data" / "processed" / "daily_avg" / "eea" / "pm_reference_stations_2024.csv"
-    high = ROOT / "data" / "processed" / "satellite_eea" / "high_res_multispec"
-    low = ROOT / "data" / "processed" / "satellite_eea" / "low_res_multispec"
-    missing = [rel(p) for p in (labels, high, low) if not p.exists()]
-    if missing:
-        return False, "missing " + ", ".join(missing)
-    if not any(high.glob("*.npy")) or not any(low.glob("*.npy")):
-        return False, "patch directories exist but contain no .npy patch files"
-    return True, f"{rel(labels)} + {rel(high)} + {rel(low)}"
-
-
 def write_manifest(rows: list[dict[str, str]]) -> None:
     lines = [
         "# Figure Sources",
@@ -857,66 +821,34 @@ def main() -> None:
             source="08_kreislevel_data/kreis_exposure_socioeconomic.csv; missing local Kreis boundary geometry",
             status="not regenerated: " + maps_output.splitlines()[-1],
         )
-    copy_figure(
-        rows,
-        ROOT / "Air_pollution_report/Figures/sensors_map_static.png",
-        "sensors_map_static.png",
-        script="05_scripts_visual/plot_sensors_map_static.py",
-        inputs="`data/processed/daily_avg/eea/pm_reference_stations_2024.csv`, Europe boundary GeoJSON",
-        status="copied existing report figure; source data directory is absent in this checkout",
-    )
-    copy_figure(
-        rows,
-        ROOT / "Air_pollution_report/Figures/fold_map.png",
-        "fold_map.png",
-        script="06_models/00_assign_folds.py",
-        inputs="`data/processed/daily_avg/eea/pm_reference_stations_2024.csv`, `data/processed/uba/station_land.csv`",
-        status="copied existing report figure; source data directory is absent in this checkout",
-    )
-    copy_figure(
-        rows,
-        ROOT / "Air_pollution_report/Figures/preview_patches.png",
-        "preview_patches.png",
-        script="04_GEE patch-preview workflow noted in PIPELINE_OVERVIEW.md",
-        inputs="Sentinel-2 patch arrays under `data/processed/satellite_eea/`",
-        status="copied existing report figure; patch arrays are absent in this checkout",
-    )
-    copy_figure(
-        rows,
-        ROOT / "Air_pollution_report/Figures/graphs_and_plots/drawio.jpg",
-        "pipeline_overview_original_drawio.jpg",
-        script="manual draw.io export",
-        inputs="manual pipeline stages",
-        status="copied for provenance before redesign; not intended as the report-facing replacement",
-    )
-
     write_pipeline_figure(rows)
     write_data_size_summary(rows)
     write_coverage_validation_geography(rows)
     write_dense_prediction_residual_maps(rows)
 
-    urban_ok, urban_source = has_urban_rural_source()
-    rows.append(
-        {
-            "figure": "urban_rural_pm_distribution.png",
-            "script": "09_report_figures/build_report_figures.py",
-            "inputs": urban_source,
-            "source": urban_source,
-            "output": rel(GENERATED / "urban_rural_pm_distribution.png"),
-            "status": "not produced: explicit urban/rural classification not available" if not urban_ok else "ready to implement from explicit classification",
-        }
+    add_generated_row(
+        rows,
+        "urban_rural_pm25_distribution.png",
+        script="09_report_figures/build_preliminary_analysis_figures.py",
+        inputs="saved development CV predictions, daily EEA PM2.5 counts and station-area metadata",
+        source="analysis_outputs/preliminary_analysis/urban_rural_pm25_summary_collapsed.csv",
+        status="generated by the preliminary-analysis figure script from development stations",
     )
-
-    patch_ok, patch_source = has_patch_source()
-    rows.append(
-        {
-            "figure": "high_low_pm_patch_examples.png",
-            "script": "09_report_figures/build_report_figures.py",
-            "inputs": patch_source,
-            "source": patch_source,
-            "output": rel(GENERATED / "high_low_pm_patch_examples.png"),
-            "status": "not produced: model-ready label/patch artifacts unavailable" if not patch_ok else "ready to implement from percentile-selected station patches",
-        }
+    add_generated_row(
+        rows,
+        "high_low_pm25_patch_examples.png",
+        script="09_report_figures/build_preliminary_analysis_figures.py",
+        inputs="local processed EEA labels and Sentinel-2 high-resolution arrays",
+        source="analysis_outputs/preliminary_analysis/high_low_pm25_selected_stations.csv",
+        status="generated from the three lowest and three highest eligible German development stations",
+    )
+    add_generated_row(
+        rows,
+        "high_low_pm25_patch_examples_lowres.png",
+        script="09_report_figures/build_preliminary_analysis_figures.py",
+        inputs="same selected stations and low-resolution Sentinel-2 arrays",
+        source="analysis_outputs/preliminary_analysis/high_low_pm25_selected_stations.csv",
+        status="generated as wider-context companion figure",
     )
 
     write_manifest(rows)

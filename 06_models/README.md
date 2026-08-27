@@ -44,8 +44,7 @@ scratch CNN shows what can be learned directly from the pollution dataset.
 |-- resnet/
 |-- cnn/
 |-- data_size_ablation/
-|-- results/
-`-- archive/
+`-- results/
 ```
 
 - `00_assign_folds.py` builds `data/processed/eea/station_fold.csv`, the station
@@ -77,8 +76,6 @@ scratch CNN shows what can be learned directly from the pollution dataset.
 - `data_size_ablation/` contains the optional reduced-training-data experiment
   and plots of model performance as labelled training data decreases.
 - `results/` contains generated CV results, checkpoints, and prediction CSVs.
-- `archive/` keeps older Sensor.Community work that is no longer part of the
-  current EEA reference-station pipeline.
 
 ## Modeling Workflow
 
@@ -100,8 +97,8 @@ python3 06_models/run_experiment_suite.py --all
 python3 06_models/run_experiment_suite.py --postprocess
 
 # 4. Final training and TEST evaluation are separate, explicit steps only
-python3 06_models/02_train_final.py --experiment cnn_deep --wide
-python3 06_models/03_predict_test.py --experiment cnn_deep --wide
+python3 06_models/02_train_final.py --experiment cnn_deep_wide
+python3 06_models/03_predict_test.py --experiment cnn_deep_wide
 ```
 
 `00_assign_folds.py` should only be run when `station_fold.csv` genuinely needs
@@ -166,7 +163,7 @@ To widen either scratch CNN:
 
 ```bash
 python3 06_models/01_train_cv.py --experiment cnn --wide
-python3 06_models/01_train_cv.py --experiment cnn_deep --wide
+python3 06_models/01_train_cv.py --experiment cnn_deep_wide
 ```
 
 To run only a few development folds while testing code:
@@ -431,42 +428,16 @@ parameters use `lr_head`, and trainable pretrained backbone parameters use
 `lr_backbone`. In CNN mode, all trainable CNN parameters currently share one
 optimizer group using `lr` and `weight_decay`.
 
-`NUM_WORKERS` in `shared/config.py` controls how many extra worker processes
-PyTorch uses for each DataLoader. It currently defaults to `0` because the
-university JupyterHub container has very limited shared memory (`/dev/shm` is
-64 MB). Multiple workers can exceed that limit with these large multimodal
-batches and cause bus errors before training starts. Using `0` loads data in the
-main process. This changes runtime behavior only; it does not change the model,
-folds, inputs, labels, metrics, or scientific experiment.
-
-With `NUM_WORKERS=0`, patch files are read serially in the main process.
-Repeated `.npy` reads can become slow because the same station patches are used
-again every epoch. The shared Dataset therefore keeps loaded patches in ordinary
-process RAM when `CACHE_PATCHES=True`. The cache is lazy: a patch is loaded from
-disk the first time it is requested, then reused from RAM later. Cached arrays
-are copied before they are returned, so random rotation/flip augmentation cannot
-alter the stored base patch. This is only a runtime optimization and does not
-change the model inputs or experiment.
-
-`CPU_THREADS` and `CPU_INTEROP_THREADS` limit PyTorch CPU parallelism at script
-startup. The current defaults are 8 intra-op threads and 4 inter-op threads.
-This keeps small CPU-side tensor, augmentation, and collation work from trying
-to use every CPU visible inside the JupyterHub container. The scripts print the
-effective values at startup so the runtime setting can be checked.
+On the university JupyterHub we use `NUM_WORKERS=0` because of limited shared
+memory. Optional patch caching reduces repeated disk reads. CPU thread limits
+and timing logs are runtime diagnostics. These settings affect runtime but not
+the experimental design.
 
 CV training can run for up to `CV_EPOCHS` epochs. Early stopping watches the
 mean validation RMSE across configured pollutants. `best_epoch` is the one-based
 epoch number with the best validation RMSE. Final training does not use a held
 out fold. For the saved `cnn_deep_wide` final model, the epoch count is fixed in
 `results/cnn_deep_wide/final_model_selection.json`.
-
-Each CV epoch also prints a compact timing line for the training pass, average
-training batch time, train-subset evaluation, validation evaluation with the
-current TTA setting, and total epoch time. This is only logging; it is there to
-help diagnose runtime bottlenecks without changing the model or experiment.
-The training pass also prints a short detail line for DataLoader waiting,
-CPU-to-device transfer, forward/loss calculation, backward pass, and optimizer
-work so slow epochs can be traced more precisely.
 
 Metrics:
 
@@ -561,8 +532,8 @@ results/summary/supplementary_full_cv.csv
 results/summary/iberia_diagnostics.csv
 ```
 
-Use `python3 06_models/summarize_cv_results.py --all-existing` for the
-classified history summary under `results/summary/all_existing/`.
+Use `python3 06_models/summarize_cv_results.py --all-existing` only when you
+need a historical result inventory under `results/archive/historical_result_inventory/`.
 
 Generated checkpoints and large result files should usually stay out of Git
 unless they are intentionally needed for hand-in or reproducibility.
@@ -589,34 +560,6 @@ python3 06_models/check_shared_logic.py
 It is a lightweight assertion-based smoke test. No terminal output means all
 checks passed.
 
-It currently checks:
-
-- development-fold filtering;
-- exclusion of TEST and UNASSIGNED folds where appropriate;
-- the 100 km spatial leakage buffer;
-- DataLoader partial-batch behavior;
-- singleton-batch handling for BatchNorm safety;
-- patch-cache reuse and cached-array mutation protection;
-- arithmetic train-mean baseline behavior;
-- prediction metadata;
-- experiment selection routes;
-- epoch-history, fold-summary, and run-metadata serialization;
-- summary-table behavior with complete and incomplete result folders;
-- separate result paths for each experiment;
-- the recorded final epoch rule;
-- frozen ResNet trainability;
-- full-backbone ResNet trainability;
-- pretrained BatchNorm freezing;
-- BatchNorm staying in eval mode after `model.train()`;
-- optimizer parameter groups;
-- expected parameter counts;
-- experiment metadata;
-- dummy forward-pass output shape.
-
-It does not test:
-
-- real satellite-data completeness;
-- actual model convergence;
-- model quality;
-- CV performance;
-- sealed TEST performance.
+The script runs lightweight checks for fold filtering, buffer logic, model
+trainability, result paths, normalization, baseline behavior and expected
+parameter counts. It does not test model convergence or result quality.

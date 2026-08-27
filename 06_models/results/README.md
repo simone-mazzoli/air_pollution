@@ -64,8 +64,8 @@ python3 06_models/summarize_cv_results.py --all-existing
 This writes:
 
 ```text
-summary/all_existing/all_experiments_classified.csv
-summary/all_existing/all_fold_results_classified.csv
+archive/historical_result_inventory/all_experiments_classified.csv
+archive/historical_result_inventory/all_fold_results_classified.csv
 ```
 
 ## File Meanings

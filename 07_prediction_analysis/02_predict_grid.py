@@ -7,18 +7,18 @@ Model selection matches 03_predict_test.py: pass --experiment (and possibly
 Patch loading/normalization reuses shared/data.py's existing
 load_s2_station / load_patch_raw_station / load_dem_station directly.
 Grid points come from data/processed/eea/grid_points.csv (grid_id, lat, lon,
-land), produced by 04_download_grid_patches.py. Patches live in
+land), produced by 04_GEE/02_download_dense_grid_patches.py. Patches live in
 data/processed/satellite_grid/<stream>/<grid_id>.npy, mirroring
 satellite_eea/ folder layout.
 Target de-normalization mirrors shared/data.py's EEA.__getitem__ label
 transform (y = (log(v) - tmean) / tstd) in reverse -- exp(pred*tstd+tmean).
 
-Run order: 02_train_final.py -> 04_download_grid_patches.py -> this.
-    python3 05_predict_grid.py --experiment cnn_deep --wide
+Run order: 02_train_final.py -> 04_GEE/02_download_dense_grid_patches.py -> this.
+    python3 07_prediction_analysis/02_predict_grid.py --experiment cnn_deep_wide
 
 outputs:
-    grid_results/cnn_deep_wide_grid_predictions.csv 
-    grid_results/cnn_deep_wide_grid_map.png
+    07_prediction_analysis/grid_results/cnn_deep_wide_grid_predictions.csv
+    07_prediction_analysis/grid_results/cnn_deep_wide_grid_map.png
 """
 
 import sys
@@ -54,7 +54,7 @@ def _has_all_grid_patches(gid, streams, cfg):
     return all((d / f"{gid}.npy").exists() for d in extra)
 def load_grid_frame(streams, cfg):
     if not GRID_CSV.exists():
-        raise SystemExit(f"ERROR: {GRID_CSV} not found. Run 04_download_grid_patches.py first.")
+        raise SystemExit(f"ERROR: {GRID_CSV} not found. Run 04_GEE/02_download_dense_grid_patches.py first.")
     pts = pd.read_csv(GRID_CSV, dtype={"grid_id": str})
     keep = pts["grid_id"].map(lambda gid: _has_all_grid_patches(gid, streams, cfg))
     print(f"{len(pts)} grid points -> {int(keep.sum())} with all patches")
@@ -179,8 +179,10 @@ def parse_args():
                     help="use wider scratch-CNN channels with --experiment cnn or cnn_deep")
     ap.add_argument("--batch", type=int, default=BATCH_SIZE)
     ap.add_argument("--no-tta", dest="tta", action="store_false", default=USE_TTA)
-    ap.add_argument("--out", default="grid_results/grid_predictions.csv")
-    ap.add_argument("--plot", default="grid_results/grid_map.png")
+    default_out = ROOT / "07_prediction_analysis" / "grid_results" / "grid_predictions.csv"
+    default_plot = ROOT / "07_prediction_analysis" / "grid_results" / "grid_map.png"
+    ap.add_argument("--out", default=str(default_out))
+    ap.add_argument("--plot", default=str(default_plot))
     return ap.parse_args()
 def main():
     runtime.apply_runtime_config()

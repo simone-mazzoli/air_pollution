@@ -1,5 +1,11 @@
 # PM Label-Construction Results
 
+Status: This file documents an intermediate annual calibration comparison. The
+original label recommendation was superseded by the later weather-aware,
+background-station and clustered-sensor checks. The final project does not use
+Sensor.Community measurements as CNN labels. See
+`../../SENSOR_COMMUNITY_CALIBRATION_SUMMARY.md`.
+
 ## Run Summary
 
 The 2024 PM label comparison used the corrected sensor-to-Land assignments and
@@ -135,19 +141,19 @@ Decision categories:
 
 | Candidate | Category | Reason |
 | --- | --- | --- |
-| original percentile-mapping method | recommended main labels | Preserves plausible annual target range and spatial label variation, despite weak paired held-out RMSE. |
-| OLS regression adjustment, 20 km | recommended sensitivity labels | Useful as a low-error, regression-to-the-mean sensitivity label set, but not suitable as main labels because it does not beat constant mean and strongly compresses targets. |
+| original percentile-mapping method | best range-preserving candidate within this sub-experiment; not used for final model labels | Preserves plausible annual target range and spatial label variation, despite weak paired held-out RMSE. |
+| OLS regression adjustment, 20 km | compressed sensitivity candidate within this sub-experiment; not used for final model labels | Useful as a low-error, regression-to-the-mean sensitivity label set, but not suitable as main labels because it does not beat constant mean and strongly compresses targets. |
 | other OLS/Huber regression adjustments | not recommended due to target compression | They improve over raw SDS011 but remain close to constant-mean predictions and preserve little annual variation. |
 | constant-mean baseline | not recommended due to target compression | Best RMSE, but no spatial signal and not a usable CNN target. |
 | raw SDS011 baseline | not recommended due to error | Preserves rank and variation, but has very large held-out error and malfunction tails. |
 
 Answer to the main question:
 
-- OLS 20 km should not remain the main label set.
-- The original percentile-mapping method is the most defensible main label set
-  among the available options for CNN training.
-- OLS 20 km may be kept as a sensitivity analysis for a compressed,
-  reference-agreement-oriented target.
+- OLS 20 km should not be treated as the main label set.
+- The original percentile-mapping method is the best range-preserving candidate
+  within this sub-experiment, but it is not used for final CNN training.
+- OLS 20 km is a compressed, reference-agreement-oriented candidate within this
+  sub-experiment.
 - The constant-mean baseline shows that regression RMSE improvements over raw
   are misleading unless target variation and rank preservation are checked.
 

@@ -1,9 +1,0 @@
-split,pm25_valid_day_bin,stations
-development_cv,0-181,29
-development_cv,182-328,67
-development_cv,329-365,1140
-development_cv,366,633
-held_out_test,0-181,2
-held_out_test,182-328,10
-held_out_test,329-365,47
-held_out_test,366,105

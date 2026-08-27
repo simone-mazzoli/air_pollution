@@ -1,27 +1,41 @@
-data/
+# Local data and secrets
+data/*
+!data/
+!data/README.md
 papers/
 task/
-venv/
 client_id_GEE.txt
-.vscode/*
-!.vscode/settings.json
+air_pollution_data.tar.gz
+
+# Local environments and editor files
+.venv/
+venv/
+.idea/
+.vscode/
+
+# Python caches
 __pycache__/
 *.py[cod]
 .ipynb_checkpoints/
+
+# macOS files
 .DS_Store
 ._*
 
-# LaTeX build output
-Air_pollution_report/build/
-Air_pollution_report/*.aux
-Air_pollution_report/*.bbl
-Air_pollution_report/*.blg
-Air_pollution_report/*.fdb_latexmk
-Air_pollution_report/*.fls
-Air_pollution_report/*.log
-Air_pollution_report/*.out
-Air_pollution_report/*.synctex.gz
-Air_pollution_report/*.toc
-06_models/02_resnet/final_model.pt
-04_GEE/sensors-related/
-eea_model_upload_bundle.zip
+# LaTeX temporary files
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+
+# Review/package files
+*.zip
+*.tar
+*.tar.gz
+FINAL_*.txt
+FINAL_*.patch

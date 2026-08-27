@@ -12,7 +12,7 @@ an image model.
 
 | Script | What it does |
 | --- | --- |
-| `audit_2024_data_completeness.py` | Checks whether the 2024 inputs are complete enough for these experiments. | 
+| `check_2024_data_completeness.py` | Checks whether the 2024 inputs are complete enough for these experiments. |
 | `calibrate_pm_regression_loo.py` | Fits OLS/Huber nearby-reference corrections and writes diagnostic outputs. |
 | `compare_label_construction_methods.py` | Compares raw SDS011, constant mean, percentile/range mapping, OLS, and Huber on the same held-out folds. |
 | `eda_close_reference_inventory.py` | Counts close SDS011-UBA pairs and nearby weather coverage. |
@@ -56,7 +56,7 @@ Weather-aware diagnostics:
 
 ```bash
 python3 01_scripts_gathering/sensors-related/03_download_uba_measurements.py --station-metadata
-python3 01_scripts_gathering/download_extract_hyras.py
+python3 01_scripts_gathering/sensors-related/05_download_extract_hyras.py
 python3 03_scripts_calibration/experiments/nearby_reference_regression/fit_close_reference_weather_models.py
 ```
 

@@ -17,7 +17,7 @@ models, making the comparison paired.
 
 Random seeds only affect which eligible training stations are selected for the
 reduced-data runs. They do not change the validation fold. Full-data 100% rows
-are read from the current canonical CV outputs in `06_models/results/` rather
+are read from the current saved CV outputs in `06_models/results/` rather
 than retrained here.
 
 Run the configured reduced-data experiment:

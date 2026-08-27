@@ -38,12 +38,12 @@ processed tables.
 - Bounding box is EU-wide (covers all EEA-reporting countries)
 - Sentinel-2 uses `COPERNICUS/S2_SR_HARMONIZED` with a cloud filter
   (`CLOUDY_PIXEL_PERCENTAGE < 20`) and annual median composite.
-- `high_res`: `120 x 120` px @ 10 m/px (1.2 km). `low_res`: `60 x 60` px @
-  200 m/px (12 km).
-- `no2`/`aer`/`co`: `5 x 5` px @ 7 km/px (35 km). `aer_wide`: `31 x 31` px @
-  7 km/px (217 km).
-- `dem`: static Copernicus GLO-30 mosaic, `60 x 60` px @ 200 m/px (12 km), no
-  date filter.
+- `high_res`: `120 x 120` px at nominal 10 m projected spacing.
+- `low_res`: `60 x 60` px at nominal 200 m projected spacing.
+- `no2`/`aer`/`co`: `5 x 5` px at nominal 7 km projected spacing.
+- `aer_wide`: `31 x 31` px at nominal 7 km projected spacing.
+- `dem`: static Copernicus GLO-30 mosaic at nominal 200 m projected spacing.
+- The exports are constructed in EPSG:3857, so these are nominal projected
+  footprints rather than exact physical ground dimensions.
 - Patch arrays are generated locally and should not be committed.
-
 

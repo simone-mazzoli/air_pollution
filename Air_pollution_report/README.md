@@ -1,20 +1,20 @@
 # Air Pollution Report
 
-`main_merged.tex` is the active working report. The current compiled PDF is
+`main_merged.tex` is the final report source. The current compiled PDF is
 `build/main_merged.pdf`.
 
 - `references.bib` contains bibliography entries.
-- `Figures/` contains report figures and image assets used by the report.
-- `legacy/` preserves older `.tex` versions.
-- `build/` contains generated LaTeX files and is not tracked.
-- `main_merged_text_pass.tex` and `build/main_merged_text_pass.pdf` are older
-  text-pass files. Keep them unless the team decides they are no longer needed.
+- `natbiger.bst` is the bibliography style used by the report.
+- `Figures/generated/` contains report figures built from saved outputs.
+- `Figures/UniKonstanz_Logo_Optimum_sRGB.jpg` is used on the title page.
+- `Figures/FIGURE_SOURCES.md` explains where the report figures come from.
 
-Compile locally with:
+Build locally from this directory with:
 
 ```bash
-cd Air_pollution_report
-latexmk -pdf main_merged.tex
+latexmk -pdf -outdir=build main_merged.tex
 ```
 
-In VS Code, open `main_merged.tex` and use LaTeX Workshop. The repository settings build on save with `latexmk`, keep SyncTeX enabled, and open the PDF preview in a VS Code tab.
+Routine LaTeX build files in `build/` are not part of the report content. The
+PDF `build/main_merged.pdf` is kept so the reviewed report can be opened
+directly.

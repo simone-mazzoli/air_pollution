@@ -101,5 +101,5 @@ than population-weighted personal exposure.
 ## Data Location
 
 Most scripts expect a local `data/` directory at the repository root. The
-repository keeps only `data/README.md`; large raw downloads and processed arrays
+repository keeps only `data/README.md`. Large raw downloads and processed arrays
 must be stored locally outside Git.

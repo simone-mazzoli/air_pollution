@@ -7,7 +7,7 @@ analysis.
 
 Inputs
 ------
-grid_results/cnn_deep_wide_grid_predictions.csv
+07_prediction_analysis/grid_results/cnn_deep_wide_grid_predictions.csv
 08_kreislevel_data/socioeconomic_kreis_2024.csv
 
 Kreis geometry is loaded from:
@@ -54,7 +54,9 @@ except ImportError as exc:
 
 ROOT = Path(__file__).resolve().parents[1]
 
-DEFAULT_GRID = ROOT / "grid_results" / "cnn_deep_wide_grid_predictions.csv"
+DEFAULT_GRID = (
+    ROOT / "07_prediction_analysis" / "grid_results" / "cnn_deep_wide_grid_predictions.csv"
+)
 DEFAULT_SOCIO = ROOT / "08_kreislevel_data" / "socioeconomic_kreis_2024.csv"
 
 PROJECT_KREIS_GEOJSON = (

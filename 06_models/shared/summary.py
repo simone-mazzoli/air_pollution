@@ -111,7 +111,7 @@ def summarize_results(experiments=SUMMARY_EXPERIMENTS, out_dir=None, *, require_
 
 
 def summarize_all_existing(out_dir=None):
-    out_dir = paths.RESULTS / "summary" / "all_existing" if out_dir is None else out_dir
+    out_dir = paths.RESULTS / "archive" / "historical_result_inventory" if out_dir is None else out_dir
     missing, comparison, fold_comparison = summary_rows(ALL_RESULT_EXPERIMENTS, require_complete=False)
     out_dir.mkdir(parents=True, exist_ok=True)
     if len(comparison):

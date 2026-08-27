@@ -13,12 +13,9 @@ python3 05_scripts_visual/plot_sensors_map_static.py
 
 | Script | Output |
 | --- | --- |
-| `plot_sensors_map_static.py` | `data/processed/plots/sensors_map_static.png` |
-
-The map is added to the `graphs_and_plots` folder
+| `plot_sensors_map_static.py` | `Air_pollution_report/Figures/generated/sensors_map_static.png` |
 
 ## Input 
 
 This script uses `pm_reference_stations_2024.csv` for the sensors on the map
-
 
