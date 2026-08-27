@@ -164,13 +164,13 @@ The remainder of this report is structured as follows. Section 2 describes the d
 
 In this section, we describe the data sources used in this project and the processing steps applied to produce valid, model-ready training data.
 
-We use three main categories of data: particulate matter (PM) measurements, satellite patches including pollution covariates and socioeconomic data. Figure 1 provides an overview of the different data types used. Unless otherwise specified, the data refer to the year 2024.
+We use three main categories of data: particulate matter (PM) measurements, satellite patches including pollution covariates and socioeconomic data. Figure~\ref{fig:pipeline_overview} provides an overview of the different data types used. Unless otherwise specified, the data refer to the year 2024.
 
 %figure with overview of data types 
 
 \subsection{PM Data}
 
-We gather PM measurements that serve as labels for our models to train. Low-cost (LC) sensor measurements are gathered from Sensor.Community \citep{sensorcommunity2026}, while reference stations across Europe (EEA stations) are fetched using the EEA API \citep{eea_aqereporting}. Sensor.Community is a non-profit organisation that collects data from private sensors. They supply information for how private actors can install a home sensor and collect the data from sensors connected to their network. They provide access to approximately ten thousand sensors globally. The EEA collects data from local and regional authorities and creates uniform datasets with environmental data across Europe. The Sensor.Community sensors are abundant and cover many areas not extensively covered by the EEA stations, while the latter provide high quality measurements to test the low cost sensors' validity.
+We gather PM measurements that serve as labels for our models to train. Low-cost (LC) sensor measurements are gathered from Sensor.Community \citep{sensorcommunity2026}, while reference stations across Europe (EEA stations) are fetched using the EEA API \citep{eea_aqereporting}. Sensor.Community is a non-profit organization that collects data from private sensors. They supply information for how private actors can install a home sensor and collect the data from sensors connected to their network. They provide access to approximately ten thousand sensors globally. The EEA collects data from local and regional authorities and creates uniform datasets with environmental data across Europe. The Sensor.Community sensors are abundant and cover many areas not extensively covered by the EEA stations, while the latter provide high quality measurements to test the low cost sensors' validity.
 
 
 %preprocessing decisions 
@@ -204,7 +204,7 @@ Using the EEA station-area categories, annual PM2.5 is highest on average at urb
 
 
 
-\subsection{Satellite Data:}
+\subsection{Satellite Data}
 
 Satellite patches are fetched through the Google Earth Engine (GEE) API \citep{gorelick2017earthengine}. For each reference station location, we extract Sentinel-2 (S2) multispectral patches \citep{drusch2012sentinel2} at two spatial resolutions: 120 x 120 pixels at a nominal 10 m export spacing for local detail and 60 x 60 pixels at a nominal 200 m export spacing for wider spatial context. The S2 patches are built as cloud-filtered annual median composites. Following the band selection used by the BigEarthNet-pretrained ResNet50, we keep ten of the thirteen total Sentinel-2 bands. We therefore exclude coastal aerosol, water vapor and cirrus. The satellite images are augmented during training by random rotations in increments of 90 degrees.
 
@@ -231,19 +231,20 @@ In addition to S2 imagery, we incorporate four auxiliary covariates through the 
 
 %potentially a heatmap, how are they related to PM as justification for their inclusion, 
 
-\subsection{Socio-Economic Data}
+\subsection{Socioeconomic Data}
 
 To examine whether modeled air pollution is spatially associated with
 socioeconomic and demographic characteristics, we construct a dataset at the
 German Kreis level. The dataset covers all 400 Kreise and combines information
 from several official sources. Population, age structure, median age and
-population density refer to 2024 and are obtained from Eurostat. Kreis-level
+population density refer to 2024 and are obtained from Eurostat
+\citep{eurostat_pjanaggr3,eurostat_pjanind3,eurostat_d3dens}. Kreis-level
 unemployment rates for 2024 are obtained from the German Federal Employment
-Agency. Disposable household income per capita is taken from the Regional
-Accounts of the German States (VGRdL) and refers to 2023. Finally, indicators
+Agency \citep{ba_arbeitslosenquoten2024}. Disposable household income per capita is taken from the Regional
+Accounts of the German States (VGRdL) and refers to 2023 \citep{vgrdl_r2b3_2023}. Finally, indicators
 of immigration history, nationality and educational attainment are derived
-from the 2022 German Census. Administrative Kreis identifiers and boundaries
-are based on official BKG geodata \citep{eurostat_pjanaggr3,eurostat_pjanind3,eurostat_d3dens,ba_arbeitslosenquoten2024,vgrdl_r2b3_2023,zensus2022_demografie,zensus2022_bildung,bkg_vg250_2024}.
+from the 2022 German Census \citep{zensus2022_demografie,zensus2022_bildung}. Administrative Kreis identifiers and boundaries
+are based on official BKG geodata \citep{bkg_vg250_2024}.
 
 Because the most recent available observation year differs across data
 sources, we retain the original reference year of each variable. The socioeconomic variables
@@ -271,7 +272,7 @@ of the selected indicators and their full correlation matrix are shown in
 Figures~\ref{fig:socioeconomic_distributions} and
 \ref{fig:socioeconomic_correlations} in the appendix.
 
-\section{Calibration of LC PM sensors}
+\section{Calibration of LC PM Sensors}
 
 Before using Sensor.Community measurements as additional labels, we test whether the low-cost SDS011 measurements can be calibrated against nearby German reference stations. Sensor.Community coverage is participation-driven rather than designed to be representative, so regions with fewer participating households can remain undermeasured. Since we do not use these measurements as final model labels, this source of selection does not directly enter the final training labels although the official reference network is also spatially uneven. Humidity can introduce systematic bias in low-cost PM measurements, so annual averaging alone does not guarantee unbiased labels. This is one reason why we also test the weather-aware calibration below. We first compare the raw annual SDS011 measurements with a constant reference-mean baseline and several calibration methods. The baseline predicts the training reference mean for each held-out station. If a calibration method is useful for our purpose, it should improve on this baseline while still preserving meaningful spatial differences between stations.
 
@@ -323,6 +324,7 @@ However, this improvement does not carry over to the annual labels we need for m
 We trained two model families. Firstly, we trained a CNN constructed from scratch. Secondly, we evaluated ResNet-50 based variants using a backbone pretrained on BigEarthNet v2 imagery \citep{he2015deepresiduallearningimage,clasen2025refinedbigearthnet}. This lets us test whether using a backbone pretrained on satellite imagery improves PM2.5 prediction in our multimodal setup.
 
 \subsection{CNN created from scratch}
+\label{sec:cnn_scratch}
 
 
 % # CNN architecture
@@ -407,7 +409,7 @@ NO2/CO patch means, aerosol center-pixel value, elevation \\
 \end{table}
 
 
-The CNN created from scratch combines separate branches for the high-resolution Sentinel-2 patch, the low-resolution Sentinel-2 patch, Sentinel-5P inputs, wide aerosol context and DEM elevation. The high-resolution branch has four convolutional blocks with increasing channel size. The smaller input branches use shallower CNNs. Their outputs are normalized before they are combined with scalar context values in the regression head. These scalar values are the NO2 patch mean, the CO patch mean, the centre-pixel value of the wide aerosol patch and station elevation.
+The CNN created from scratch combines separate branches for the high-resolution Sentinel-2 patch, the low-resolution Sentinel-2 patch, Sentinel-5P inputs, wide aerosol context and DEM elevation. The high-resolution branch has four convolutional blocks with increasing channel size. The smaller input branches use shallower CNNs. Their outputs are normalized before they are combined with scalar context values in the regression head. These scalar values are the NO2 patch mean, the CO patch mean, the center-pixel value of the wide aerosol patch and station elevation.
 
 
 \begin{table}[ht]
@@ -442,7 +444,10 @@ Max epochs / patience & 500 / 25 \\
 
 \subsection{ResNet-50 Based Model}
 
-The ResNet-50 variant replaces the scratch high-resolution encoder with a ResNet-50 pretrained on BigEarthNet v2, also referred to as reBEN \citep{clasen2025refinedbigearthnet}. The pretrained model uses the same ten Sentinel-2 bands as the high-resolution scratch branch. Only the high-resolution Sentinel-2 patch passes through this backbone. Every other data modality uses the same scratch CNN branches described in Subsection 4.1. The comparison therefore asks whether the evaluated pretrained representation improves annual station-level PM2.5 regression in our multimodal setup.
+The ResNet-50 variant replaces the scratch high-resolution encoder with a ResNet-50 pretrained on BigEarthNet v2, also referred to as reBEN \citep{clasen2025refinedbigearthnet}. The pretrained model uses the same ten Sentinel-2 bands as the high-resolution scratch branch. Only the high-resolution Sentinel-2 patch passes through this backbone. Every other data modality uses the same scratch CNN branches described in Subsection~\ref{sec:cnn_scratch}. The comparison therefore asks whether the evaluated pretrained representation improves annual station-level PM2.5 regression in our multimodal setup.
+We experiment with several hyperparameter configurations, especially varying the freezing or unfreezing of the backbone layers, the learning rate and the dropout rate. Table~\ref{tab:resnet_frozen_architecture} reports the architecture of the frozen ResNet variant used for the main comparison, which only differs from \texttt{cnn\_deep\_wide} in the High-resolution branch. It uses a frozen backbone, a head learning rate of $1\times10^{-5}$ and a dropout rate of 0.8; all other hyperparameters are identical to \texttt{cnn\_deep\_wide} (Table~\ref{tab:cnn_deep_wide_hparams}). A backbone-trainable diagnostic was evaluated only on the Iberia fold and gave a similar result to the frozen variant.
+
+
 
 \begin{table}[ht]
 \centering
@@ -478,25 +483,6 @@ Global Average Pooling $\rightarrow$ Linear projection (trainable) \\
 
 
 
-We experiment with several hyperparameter configurations, especially varying the freezing or unfreezing of the backbone layers, the learning rate and the dropout rate. Table~\ref{tab:resnet_frozen_architecture} reports the architecture of the frozen ResNet variant used for the main comparison, while Table~\ref{tab:resnet_frozen_hparams} summarizes the hyperparameters. The main ResNet comparison uses a frozen backbone. A backbone-trainable diagnostic was evaluated only on the Iberia fold and gave a similar result to the frozen variant.
-
-
-
-
-
-\begin{table}[ht]
-\centering
-\caption{Hyperparameters for the frozen-backbone model. All other values (weight decay, batch size, projection dim, low-res/Sentinel-5P/wide-aerosol/DEM branch widths, regression head width, spatial buffer, TTA, max epochs/patience) are identical to \texttt{cnn\_deep\_wide} (Table~\ref{tab:cnn_deep_wide_hparams}).}
-\label{tab:resnet_frozen_hparams}
-\begin{tabular}{ll}
-\hline
-\textbf{Hyperparameter} & \textbf{Value} \\
-\hline
-lr\_head & $1\times10^{-5}$ \\
-dropout & 0.8 \\
-\hline
-\end{tabular}
-\end{table}
 
 
 \section{Results}
@@ -580,14 +566,14 @@ We apply the selected scratch model across the northern/eastern German region on
 
 Across the 1,728 grid points, predicted PM2.5 ranges from approximately 5.02 to 17.13 \si{\micro\gram\per\cubic\meter}. The map shows several areas with relatively high predicted values, including around Berlin and Leipzig. However, the TEST results also show systematic overprediction and weak prediction of within-region variation. We therefore treat the map as an exploratory spatial prediction rather than a replacement for monitoring data or a direct ranking of intervention priorities.
 
-\section{Socio-Economic Analysis}
+\section{Socioeconomic Analysis}
 
 \subsection{Aggregation of predicted PM2.5 to Kreis level}
 
 The dense-grid predictions described in Section~\ref{sec:results} are produced
 at regularly spaced locations rather than directly at administrative units.
 To combine these predictions with the socioeconomic data, each grid point is
-therefore assigned to the Kreis polygon containing its centre coordinates.
+therefore assigned to the Kreis polygon containing its center coordinates.
 Predicted PM2.5 is then averaged across all grid points located within each
 Kreis.
 
